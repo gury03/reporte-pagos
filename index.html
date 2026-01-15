@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- CSP para permitir CallMeBot -->
+    <!-- CSP mejorado para evitar bloqueos -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' https://api.callmebot.com https://cdn.jsdelivr.net;
         script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';
         style-src 'self' 'unsafe-inline';
+        img-src 'self' data: https:;
         connect-src 'self' https://api.callmebot.com;
+        font-src 'self';
+        frame-src 'none';
+        object-src 'none'
     ">
     <title>Portal para Reportar Pagos</title>
     <style>
-        /* (Mantén todo tu CSS igual) */
         body {
             font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
@@ -27,17 +30,223 @@
             justify-content: center;
         }
         
-        /* ... (todo el resto del CSS igual) ... */
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            margin: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            color: #ff0000;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        input, button {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        input {
+            background-color: #fff;
+            color: #333;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #25D366;
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.2);
+        }
+        
+        input::placeholder {
+            color: #888;
+        }
+        
+        .error {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+            min-height: 20px;
+        }
+        
+        button {
+            background: linear-gradient(to right, #25D366, #128C7E);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            padding: 15px;
+            font-size: 18px;
+        }
+        
+        button:hover {
+            background: linear-gradient(to right, #128C7E, #25D366);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .celebrar {
+            display: none;
+            font-size: 36px;
+            font-weight: bold;
+            color: #25D366;
+            animation: celebrar 2s infinite;
+            margin: 30px 0;
+            text-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
+        }
+        
+        .info-message {
+            color: #666;
+            font-size: 14px;
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #25D366;
+        }
+        
+        .status-message {
+            display: none;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        @keyframes celebrar {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Responsividad */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .celebrar {
+                font-size: 28px;
+            }
+        }
+        
+        /* Estilo para el canvas de confeti */
+        #confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- (Mantén todo el HTML del formulario igual) -->
         <h1>Reporte de Pagos</h1>
         <p class="subtitle">Por favor, ingresa la información solicitada para continuar con el servicio.</p>
         
+        <!-- Mensaje de estado -->
+        <div id="statusMessage" class="status-message"></div>
+        
         <form id="suspensionForm">
-            <!-- ... (todos los campos del formulario iguales) ... -->
+            <div class="form-group">
+                <label for="nombre">Nombre del abonado</label>
+                <input type="text" id="nombre" placeholder="Ingresa tu nombre completo" required>
+                <div id="errorNombre" class="error">Por favor, ingresa tu nombre completo.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="telefono">Número de cédula</label>
+                <input type="text" id="telefono" placeholder="Ej: 12345678" required>
+                <div id="errorTelefono" class="error">Por favor, ingresa solo números.</div>
+                <div id="errorCedulaInvalida" class="error">La cédula ingresada no está registrada en el sistema.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="referencia">Referencia del pago</label>
+                <input type="text" id="referencia" placeholder="Mínimo 6 dígitos" required>
+                <div id="errorReferencia" class="error">La referencia debe tener al menos 6 números.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="fecha">Fecha de pago</label>
+                <input type="date" id="fecha" required>
+                <div id="errorFecha" class="error">Por favor, selecciona una fecha válida.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="monto">Monto pagado (Bs.)</label>
+                <input type="text" id="monto" placeholder="Ej: 50.00" required>
+                <div id="errorMonto" class="error">Por favor, ingresa un monto válido en Bs. (ej: 50.00).</div>
+            </div>
+            
+            <button type="button" id="btnEnviar">Reportar Pago</button>
         </form>
         
         <div id="mensajeRespuesta" class="info-message" style="display: none;"></div>
@@ -45,14 +254,38 @@
         <p class="info-message">Si cree que esto ha sido un error, ingrese igual la información requerida.</p>
     </div>
 
+    <!-- Mensaje de celebración -->
     <div id="mensajeCelebracion" class="celebrar">¡Gracias por tu Colaboración!</div>
 
+    <!-- Confeti -->
     <canvas id="confetti"></canvas>
 
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <!-- Confetti desde CDN local para evitar CSP issues -->
     <script>
+        // Cargar confetti de forma segura
+        function cargarConfetti() {
+            if (typeof confetti === 'undefined') {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js';
+                script.onload = inicializarAplicacion;
+                document.head.appendChild(script);
+            } else {
+                inicializarAplicacion();
+            }
+        }
+        
+        // Inicializar cuando el DOM esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', cargarConfetti);
+        } else {
+            cargarConfetti();
+        }
+    </script>
+
+    <script>
+        // ================= CONFIGURACIÓN =================
         // Lista de usuarios válidos (nombre y cédula)
-        const usuariosValidos = [
+        const USUARIOS_VALIDOS = [
             { nombre: "Aura Sierra", cedula: "8765151" },
             { nombre: "Ramona Leonet", cedula: "11340144" },
             { nombre: "Franklin Martinez", cedula: "12966938" },
@@ -72,68 +305,114 @@
             { nombre: "Marielitza Chacon", cedula: "19037055" }
         ];
 
-        // Variables globales
-        const telefonoInput = document.getElementById('telefono');
-        const referenciaInput = document.getElementById('referencia');
-        const montoInput = document.getElementById('monto');
-        const btnEnviar = document.getElementById('btnEnviar');
+        // Configuración de WhatsApp
+        const CONFIG = {
+            apiKey: '4460385', // Tu API Key de CallMeBot
+            numeroSoporte: '584128856847', // Tu número en formato internacional
+            callmebotUrl: 'https://api.callmebot.com/whatsapp.php'
+        };
 
-        // Inicializar cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', function() {
-            const fechaInput = document.getElementById('fecha');
-            const hoy = new Date();
-            const fechaFormateada = hoy.toISOString().split('T')[0];
-            fechaInput.max = fechaFormateada;
-            fechaInput.value = fechaFormateada;
+        // ================= VARIABLES GLOBALES =================
+        let elementos = {};
+
+        // ================= INICIALIZACIÓN =================
+        function inicializarAplicacion() {
+            // Obtener referencias a elementos DOM
+            elementos = {
+                fecha: document.getElementById('fecha'),
+                telefono: document.getElementById('telefono'),
+                referencia: document.getElementById('referencia'),
+                monto: document.getElementById('monto'),
+                btnEnviar: document.getElementById('btnEnviar'),
+                nombre: document.getElementById('nombre'),
+                statusMessage: document.getElementById('statusMessage'),
+                suspensionForm: document.getElementById('suspensionForm'),
+                mensajeCelebracion: document.getElementById('mensajeCelebracion'),
+                mensajeRespuesta: document.getElementById('mensajeRespuesta')
+            };
+
+            // Verificar que todos los elementos existan
+            if (!verificarElementos()) {
+                mostrarError('Error: Elementos del formulario no encontrados. Recarga la página.');
+                return;
+            }
+
+            // Configurar fecha
+            configurarFecha();
 
             // Configurar event listeners
-            telefonoInput.addEventListener('input', function() {
-                validarNumeros(this);
-            });
+            configurarEventListeners();
 
-            referenciaInput.addEventListener('input', function() {
-                validarReferencia(this);
-            });
+            // Mostrar mensaje de inicialización exitosa
+            console.log('Aplicación inicializada correctamente');
+        }
 
-            montoInput.addEventListener('input', function() {
-                validarMonto(this);
-            });
+        function verificarElementos() {
+            for (const [key, element] of Object.entries(elementos)) {
+                if (!element && key !== 'statusMessage' && key !== 'mensajeRespuesta') {
+                    console.error(`Elemento ${key} no encontrado`);
+                    return false;
+                }
+            }
+            return true;
+        }
 
-            montoInput.addEventListener('blur', function() {
-                formatearMontoInput(this);
-            });
+        function configurarFecha() {
+            const hoy = new Date();
+            const fechaFormateada = hoy.toISOString().split('T')[0];
+            elementos.fecha.max = fechaFormateada;
+            elementos.fecha.value = fechaFormateada;
+        }
 
-            btnEnviar.addEventListener('click', validarFormulario);
-
-            // Permitir envío con Enter
-            document.addEventListener('keypress', function(e) {
+        function configurarEventListeners() {
+            // Validación en tiempo real
+            elementos.telefono.addEventListener('input', () => validarNumeros(elementos.telefono));
+            elementos.referencia.addEventListener('input', () => validarReferencia(elementos.referencia));
+            elementos.monto.addEventListener('input', () => validarMonto(elementos.monto));
+            elementos.monto.addEventListener('blur', () => formatearMontoInput(elementos.monto));
+            
+            // Envío del formulario
+            elementos.btnEnviar.addEventListener('click', validarFormulario);
+            
+            // Envío con Enter
+            document.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
                     validarFormulario();
                 }
             });
-        });
-
-        // Función para validar que solo se ingresen números
-        function validarNumeros(input) {
-            input.value = input.value.replace(/[^0-9]/g, '');
-            const errorTelefono = document.getElementById('errorTelefono');
-            errorTelefono.style.display = input.value ? 'none' : 'block';
-            document.getElementById('errorCedulaInvalida').style.display = 'none';
         }
 
-        // Función para validar la referencia (solo números y mínimo 6 caracteres)
-        function validarReferencia(input) {
+        // ================= VALIDACIONES =================
+        function validarNumeros(input) {
+            if (!input) return;
             input.value = input.value.replace(/[^0-9]/g, '');
-            const errorReferencia = document.getElementById('errorReferencia');
-            if (input.value.length < 6 && input.value.length > 0) {
-                errorReferencia.style.display = 'block';
-            } else {
-                errorReferencia.style.display = 'none';
+            const errorTelefono = document.getElementById('errorTelefono');
+            if (errorTelefono) {
+                errorTelefono.style.display = input.value ? 'none' : 'block';
+            }
+            const errorCedulaInvalida = document.getElementById('errorCedulaInvalida');
+            if (errorCedulaInvalida) {
+                errorCedulaInvalida.style.display = 'none';
             }
         }
 
-        // Función para validar que el monto sea un número válido
+        function validarReferencia(input) {
+            if (!input) return;
+            input.value = input.value.replace(/[^0-9]/g, '');
+            const errorReferencia = document.getElementById('errorReferencia');
+            if (errorReferencia) {
+                if (input.value.length < 6 && input.value.length > 0) {
+                    errorReferencia.style.display = 'block';
+                } else {
+                    errorReferencia.style.display = 'none';
+                }
+            }
+        }
+
         function validarMonto(input) {
+            if (!input) return;
+            
             input.value = input.value.replace(/[^0-9.]/g, '');
             
             const puntos = input.value.split('.').length - 1;
@@ -150,17 +429,18 @@
             }
             
             const errorMonto = document.getElementById('errorMonto');
-            const valor = parseFloat(input.value);
-            
-            if (!input.value || isNaN(valor) || valor <= 0) {
-                errorMonto.style.display = 'block';
-            } else {
-                errorMonto.style.display = 'none';
+            if (errorMonto) {
+                const valor = parseFloat(input.value);
+                if (!input.value || isNaN(valor) || valor <= 0) {
+                    errorMonto.style.display = 'block';
+                } else {
+                    errorMonto.style.display = 'none';
+                }
             }
         }
 
-        // Función para formatear monto al perder el foco
         function formatearMontoInput(input) {
+            if (!input) return;
             let valor = input.value;
             if (valor) {
                 const numero = parseFloat(valor);
@@ -170,7 +450,6 @@
             }
         }
 
-        // Función para formatear monto con separador de miles y 2 decimales
         function formatearMonto(monto) {
             const numero = parseFloat(monto);
             if (isNaN(numero)) return '0,00';
@@ -181,61 +460,57 @@
             });
         }
 
-        // Función para validar si la cédula existe en la lista de usuarios válidos
         function validarCedula(cedula) {
-            return usuariosValidos.some(usuario => usuario.cedula === cedula);
+            return USUARIOS_VALIDOS.some(usuario => usuario.cedula === cedula);
         }
 
-        // Función para validar el formulario antes de enviar
+        // ================= VALIDACIÓN DEL FORMULARIO =================
         function validarFormulario() {
-            const nombre = document.getElementById('nombre').value.trim();
-            const telefono = document.getElementById('telefono').value;
-            const referencia = document.getElementById('referencia').value;
-            const fecha = document.getElementById('fecha').value;
-            const monto = document.getElementById('monto').value;
+            const nombre = elementos.nombre.value.trim();
+            const telefono = elementos.telefono.value;
+            const referencia = elementos.referencia.value;
+            const fecha = elementos.fecha.value;
+            const monto = elementos.monto.value;
 
             let valido = true;
 
-            // Limpiar todos los errores primero
+            // Limpiar errores previos
             document.querySelectorAll('.error').forEach(error => {
-                error.style.display = 'none';
+                if (error) error.style.display = 'none';
             });
 
             // Validar nombre
             if (!nombre) {
-                document.getElementById('errorNombre').style.display = 'block';
+                mostrarErrorElemento('errorNombre', 'Por favor, ingresa tu nombre completo.');
                 valido = false;
             }
 
-            // Validar cédula (solo números)
+            // Validar cédula
             if (!telefono || !/^\d+$/.test(telefono)) {
-                document.getElementById('errorTelefono').style.display = 'block';
+                mostrarErrorElemento('errorTelefono', 'Por favor, ingresa solo números.');
                 valido = false;
             } else if (!validarCedula(telefono)) {
-                // Validar si la cédula existe en la lista de usuarios válidos
-                document.getElementById('errorCedulaInvalida').style.display = 'block';
+                mostrarErrorElemento('errorCedulaInvalida', 'La cédula ingresada no está registrada en el sistema.');
                 valido = false;
             }
 
-            // Validar referencia (solo números y mínimo 6 caracteres)
+            // Validar referencia
             if (!referencia || !/^\d+$/.test(referencia) || referencia.length < 6) {
-                document.getElementById('errorReferencia').style.display = 'block';
+                mostrarErrorElemento('errorReferencia', 'La referencia debe tener al menos 6 números.');
                 valido = false;
             }
 
             // Validar fecha
             if (!fecha) {
-                document.getElementById('errorFecha').style.display = 'block';
+                mostrarErrorElemento('errorFecha', 'Por favor, selecciona una fecha válida.');
                 valido = false;
             } else {
-                // Verificar que la fecha no sea futura
                 const fechaSeleccionada = new Date(fecha);
                 const hoy = new Date();
                 hoy.setHours(0, 0, 0, 0);
                 
                 if (fechaSeleccionada > hoy) {
-                    document.getElementById('errorFecha').innerText = "La fecha no puede ser futura.";
-                    document.getElementById('errorFecha').style.display = 'block';
+                    mostrarErrorElemento('errorFecha', 'La fecha no puede ser futura.');
                     valido = false;
                 }
             }
@@ -243,15 +518,13 @@
             // Validar monto
             const montoNumerico = parseFloat(monto);
             if (!monto || isNaN(montoNumerico) || montoNumerico <= 0) {
-                document.getElementById('errorMonto').style.display = 'block';
+                mostrarErrorElemento('errorMonto', 'Por favor, ingresa un monto válido en Bs. (ej: 50.00).');
                 valido = false;
             }
 
-            // Si todo es válido, enviar el mensaje
             if (valido) {
                 enviarMensaje();
             } else {
-                // Desplazar al primer error
                 const primerError = document.querySelector('.error[style="display: block;"]');
                 if (primerError) {
                     primerError.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -259,19 +532,27 @@
             }
         }
 
-        // Función para enviar el mensaje (versión mejorada)
-        function enviarMensaje() {
-            const nombre = document.getElementById('nombre').value.trim();
-            const telefono = document.getElementById('telefono').value;
-            const referencia = document.getElementById('referencia').value;
-            const fecha = document.getElementById('fecha').value;
-            const monto = document.getElementById('monto').value;
+        function mostrarErrorElemento(id, mensaje) {
+            const elemento = document.getElementById(id);
+            if (elemento) {
+                elemento.textContent = mensaje;
+                elemento.style.display = 'block';
+            }
+        }
+
+        // ================= ENVÍO DE MENSAJE =================
+        async function enviarMensaje() {
+            const nombre = elementos.nombre.value.trim();
+            const telefono = elementos.telefono.value;
+            const referencia = elementos.referencia.value;
+            const fecha = elementos.fecha.value;
+            const monto = elementos.monto.value;
             
-            // Deshabilitar el botón para evitar envíos múltiples
-            btnEnviar.disabled = true;
-            btnEnviar.textContent = 'Enviando...';
+            // Deshabilitar botón
+            elementos.btnEnviar.disabled = true;
+            elementos.btnEnviar.textContent = 'Enviando...';
             
-            // Formatear la fecha para mostrarla mejor
+            // Formatear datos
             const fechaObj = new Date(fecha);
             const fechaFormateada = fechaObj.toLocaleDateString('es-VE', {
                 day: '2-digit',
@@ -279,10 +560,9 @@
                 year: 'numeric'
             });
 
-            // Formatear el monto en Bs.
             const montoFormateado = formatearMonto(monto);
             
-            // Mensaje con monto en Bs. y formato venezolano
+            // Crear mensaje
             const mensaje = `📋 *NUEVO REPORTE DE PAGO*\n\n` +
                            `👤 *Abonado:* ${nombre}\n` +
                            `🆔 *Cédula:* ${telefono}\n` +
@@ -291,79 +571,109 @@
                            `🔢 *Referencia:* ${referencia}\n\n` +
                            `_Reporte generado desde el portal de pagos_`;
 
-            // API Key y número de teléfono (AJUSTA ESTOS VALORES)
-            const apiKey = '4460385'; // Tu API Key de CallMeBot
-            const numeroSoporte = '584128856847'; // Tu número en formato internacional
-            
-            // URL de CallMeBot (asegúrate que sea HTTPS)
-            const urlCallMeBot = `https://api.callmebot.com/whatsapp.php?phone=${numeroSoporte}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
+            // Construir URL
+            const urlCallMeBot = `${CONFIG.callmebotUrl}?phone=${CONFIG.numeroSoporte}&text=${encodeURIComponent(mensaje)}&apikey=${CONFIG.apiKey}`;
 
-            // Mostrar mensaje de procesamiento
-            const mensajeRespuesta = document.getElementById('mensajeRespuesta');
-            mensajeRespuesta.innerText = "Enviando reporte de pago...";
-            mensajeRespuesta.style.display = 'block';
+            // Mostrar estado
+            mostrarEstado('Enviando reporte de pago...', 'info');
             
-            // Función para mostrar éxito
-            function mostrarExito() {
-                document.getElementById('suspensionForm').style.display = 'none';
-                mensajeRespuesta.style.display = 'none';
-                document.getElementById('mensajeCelebracion').style.display = 'block';
-                lanzarConfeti();
+            try {
+                // Método 1: Usar Image object (evita problemas CORS)
+                await enviarConImagen(urlCallMeBot);
                 
-                setTimeout(function() {
-                    location.reload();
-                }, 10000);
-            }
-            
-            // Método 1: Usando Image object (más compatible)
-            function enviarConImagen() {
-                const img = new Image();
-                img.src = urlCallMeBot;
-                img.onload = function() {
-                    mostrarExito();
-                };
-                img.onerror = function() {
-                    // Aún mostrar éxito aunque falle
-                    mostrarExito();
-                };
+                // Mostrar éxito
+                mostrarExito();
                 
-                // Timeout por si acaso
-                setTimeout(function() {
-                    mostrarExito();
-                }, 3000);
+            } catch (error) {
+                console.warn('Error en envío:', error);
+                // Mostrar éxito de todas formas al usuario
+                mostrarExito();
             }
-            
-            // Método 2: Usando fetch con manejo mejorado
-            function enviarConFetch() {
-                fetch(urlCallMeBot, { 
-                    mode: 'no-cors',
-                    cache: 'no-cache'
-                })
-                .then(() => {
-                    mostrarExito();
-                })
-                .catch(() => {
-                    mostrarExito(); // Siempre mostrar éxito al usuario
-                });
-            }
-            
-            // Usar el método más compatible
-            enviarConImagen();
-            
-            // También intentar con fetch
-            setTimeout(enviarConFetch, 100);
         }
 
-        // Función para lanzar confeti mejorado
+        function enviarConImagen(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = url;
+                
+                img.onload = resolve;
+                img.onerror = resolve; // Resolver incluso con error
+                
+                // Timeout de seguridad
+                setTimeout(resolve, 3000);
+            });
+        }
+
+        // ================= INTERFAZ DE USUARIO =================
+        function mostrarExito() {
+            // Ocultar formulario
+            if (elementos.suspensionForm) {
+                elementos.suspensionForm.style.display = 'none';
+            }
+            
+            // Ocultar mensajes previos
+            if (elementos.mensajeRespuesta) {
+                elementos.mensajeRespuesta.style.display = 'none';
+            }
+            
+            // Mostrar celebración
+            if (elementos.mensajeCelebracion) {
+                elementos.mensajeCelebracion.style.display = 'block';
+            }
+            
+            // Mostrar mensaje de éxito
+            mostrarEstado('✅ Reporte enviado exitosamente. ¡Gracias!', 'success');
+            
+            // Lanzar confeti
+            lanzarConfeti();
+            
+            // Recargar después de 10 segundos
+            setTimeout(() => {
+                location.reload();
+            }, 10000);
+        }
+
+        function mostrarEstado(mensaje, tipo = 'info') {
+            if (!elementos.statusMessage) return;
+            
+            elementos.statusMessage.textContent = mensaje;
+            elementos.statusMessage.className = 'status-message';
+            
+            if (tipo === 'success') {
+                elementos.statusMessage.classList.add('status-success');
+            } else if (tipo === 'error') {
+                elementos.statusMessage.classList.add('status-error');
+            }
+            
+            elementos.statusMessage.style.display = 'block';
+            
+            // Auto-ocultar mensajes informativos después de 5 segundos
+            if (tipo === 'info') {
+                setTimeout(() => {
+                    elementos.statusMessage.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function mostrarError(mensaje) {
+            mostrarEstado(mensaje, 'error');
+        }
+
+        // ================= CONFETI =================
         function lanzarConfeti() {
-            // Confeti inicial
+            if (typeof confetti !== 'function') {
+                console.warn('Confetti no disponible');
+                return;
+            }
+            
+            // Confeti central
             confetti({
                 particleCount: 150,
                 spread: 100,
                 origin: { y: 0.6 }
             });
             
-            // Confeti adicional después de un breve retraso
+            // Confeti lateral izquierdo
             setTimeout(() => {
                 confetti({
                     particleCount: 100,
@@ -373,6 +683,7 @@
                 });
             }, 250);
             
+            // Confeti lateral derecho
             setTimeout(() => {
                 confetti({
                     particleCount: 100,
@@ -382,19 +693,19 @@
                 });
             }, 500);
             
-            // Confeti continuo por unos segundos
+            // Confeti continuo por 3 segundos
             const intervalo = setInterval(() => {
                 confetti({
-                    particleCount: 50,
-                    spread: 70,
+                    particleCount: 30,
+                    spread: 60,
                     origin: { y: 0.6 }
                 });
-            }, 500);
+            }, 300);
             
-            // Detener confeti después de 5 segundos
+            // Detener después de 3 segundos
             setTimeout(() => {
                 clearInterval(intervalo);
-            }, 5000);
+            }, 3000);
         }
     </script>
 </body>
