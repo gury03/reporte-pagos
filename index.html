@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal para Reportar Pagos</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            margin: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            color: #ff0000;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        input, button {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        input {
+            background-color: #fff;
+            color: #333;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #25D366;
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.2);
+        }
+        
+        input::placeholder {
+            color: #888;
+        }
+        
+        .error {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        button {
+            background: linear-gradient(to right, #25D366, #128C7E);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            padding: 15px;
+            font-size: 18px;
+        }
+        
+        button:hover {
+            background: linear-gradient(to right, #128C7E, #25D366);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .celebrar {
+            display: none;
+            font-size: 36px;
+            font-weight: bold;
+            color: #25D366;
+            animation: celebrar 2s infinite;
+            margin: 30px 0;
+            text-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
+        }
+        
+        .info-message {
+            color: #666;
+            font-size: 14px;
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #25D366;
+        }
+        
+        @keyframes celebrar {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Responsividad */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .celebrar {
+                font-size: 28px;
+            }
+        }
+        
+        /* Estilo para el canvas de confeti */
+        #confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Reporte de Pagos</h1>
+        <p class="subtitle">Por favor, ingresa la información solicitada para continuar con el servicio.</p>
+        
+        <form id="suspensionForm">
+            <div class="form-group">
+                <label for="nombre">Nombre del abonado</label>
+                <input type="text" id="nombre" placeholder="Ingresa tu nombre completo" required>
+                <div id="errorNombre" class="error">Por favor, ingresa tu nombre completo.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="telefono">Número de cédula</label>
+                <input type="text" id="telefono" placeholder="Ej: 12345678" required>
+                <div id="errorTelefono" class="error">Por favor, ingresa solo números.</div>
+                <div id="errorCedulaInvalida" class="error">La cédula ingresada no está registrada en el sistema.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="referencia">Referencia del pago</label>
+                <input type="text" id="referencia" placeholder="Mínimo 6 dígitos" required>
+                <div id="errorReferencia" class="error">La referencia debe tener al menos 6 números.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="fecha">Fecha de pago</label>
+                <input type="date" id="fecha" required>
+                <div id="errorFecha" class="error">Por favor, selecciona una fecha válida.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="monto">Monto pagado (Bs.)</label>
+                <input type="text" id="monto" placeholder="Ej: 50.00" required>
+                <div id="errorMonto" class="error">Por favor, ingresa un monto válido en Bs. (ej: 50.00).</div>
+            </div>
+            
+            <button type="button" id="btnEnviar">Reportar Pago</button>
+        </form>
+        
+        <div id="mensajeRespuesta" class="info-message" style="display: none;"></div>
+        
+        <p class="info-message">Si cree que esto ha sido un error, ingrese igual la información requerida.</p>
+    </div>
+
+    <!-- Mensaje de celebración -->
+    <div id="mensajeCelebracion" class="celebrar">¡Gracias por tu Colaboración!</div>
+
+    <!-- Confeti -->
+    <canvas id="confetti"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script>
+        // Lista de usuarios válidos (nombre y cédula)
+        const usuariosValidos = [
+            { nombre: "Aura Sierra", cedula: "8765151" },
+            { nombre: "Ramona Leonet", cedula: "11340144" },
+            { nombre: "Franklin Martinez", cedula: "12966938" },
+            { nombre: "Milagros Evariste", cedula: "14010067" },
+            { nombre: "Milagros Del Valle Leonet", cedula: "18653874" },
+            { nombre: "Maritza Evariste", cedula: "16175332" },
+            { nombre: "Luisa Elvira Gonzalez", cedula: "14859201" },
+            { nombre: "Yanilse Azocar", cedula: "18081290" },
+            { nombre: "Denny Ramos", cedula: "17218815" },
+            { nombre: "Iraidis Mendez", cedula: "18865487" },
+            { nombre: "Eduardo Leonett", cedula: "20403409" },
+            { nombre: "Luis Leonett", cedula: "26341332" },
+            { nombre: "Yanisca Millan", cedula: "24878596" },
+            { nombre: "Diosnelys Galera", cedula: "26061595" },
+            { nombre: "Richard Leonett", cedula: "28347527" },
+            { nombre: "Arianny Leonett", cedula: "32108176" },
+            { nombre: "Marielitza Chacon", cedula: "19037055" }
+        ];
+
+        // Variables globales
+        const telefonoInput = document.getElementById('telefono');
+        const referenciaInput = document.getElementById('referencia');
+        const montoInput = document.getElementById('monto');
+        const btnEnviar = document.getElementById('btnEnviar');
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            const fechaInput = document.getElementById('fecha');
+            const hoy = new Date();
+            const fechaFormateada = hoy.toISOString().split('T')[0];
+            fechaInput.max = fechaFormateada;
+            fechaInput.value = fechaFormateada;
+
+            // Configurar event listeners
+            telefonoInput.addEventListener('input', function() {
+                validarNumeros(this);
+            });
+
+            referenciaInput.addEventListener('input', function() {
+                validarReferencia(this);
+            });
+
+            montoInput.addEventListener('input', function() {
+                validarMonto(this);
+            });
+
+            montoInput.addEventListener('blur', function() {
+                formatearMontoInput(this);
+            });
+
+            btnEnviar.addEventListener('click', validarFormulario);
+
+            // Permitir envío con Enter
+            document.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    validarFormulario();
+                }
+            });
+        });
+
+        // Función para validar que solo se ingresen números
+        function validarNumeros(input) {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            const errorTelefono = document.getElementById('errorTelefono');
+            errorTelefono.style.display = input.value ? 'none' : 'block';
+            document.getElementById('errorCedulaInvalida').style.display = 'none';
+        }
+
+        // Función para validar la referencia (solo números y mínimo 6 caracteres)
+        function validarReferencia(input) {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            const errorReferencia = document.getElementById('errorReferencia');
+            if (input.value.length < 6 && input.value.length > 0) {
+                errorReferencia.style.display = 'block';
+            } else {
+                errorReferencia.style.display = 'none';
+            }
+        }
+
+        // Función para validar que el monto sea un número válido
+        function validarMonto(input) {
+            // Permite números y un punto decimal, pero solo un punto
+            input.value = input.value.replace(/[^0-9.]/g, '');
+            
+            // Verificar si hay más de un punto
+            const puntos = input.value.split('.').length - 1;
+            if (puntos > 1) {
+                input.value = input.value.substring(0, input.value.lastIndexOf('.'));
+            }
+            
+            // Formatear para mostrar siempre con 2 decimales mientras se escribe
+            if (input.value.includes('.')) {
+                const partes = input.value.split('.');
+                if (partes[1].length > 2) {
+                    partes[1] = partes[1].substring(0, 2);
+                    input.value = partes.join('.');
+                }
+            }
+            
+            const errorMonto = document.getElementById('errorMonto');
+            const valor = parseFloat(input.value);
+            
+            if (!input.value || isNaN(valor) || valor <= 0) {
+                errorMonto.style.display = 'block';
+            } else {
+                errorMonto.style.display = 'none';
+            }
+        }
+
+        // Función para formatear monto al perder el foco
+        function formatearMontoInput(input) {
+            let valor = input.value;
+            if (valor) {
+                const numero = parseFloat(valor);
+                if (!isNaN(numero)) {
+                    // Asegurar 2 decimales
+                    input.value = numero.toFixed(2);
+                }
+            }
+        }
+
+        // Función para formatear monto con separador de miles y 2 decimales
+        function formatearMonto(monto) {
+            const numero = parseFloat(monto);
+            if (isNaN(numero)) return '0,00';
+            
+            return numero.toLocaleString('es-VE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Función para validar si la cédula existe en la lista de usuarios válidos
+        function validarCedula(cedula) {
+            return usuariosValidos.some(usuario => usuario.cedula === cedula);
+        }
+
+        // Función para validar el formulario antes de enviar
+        function validarFormulario() {
+            const nombre = document.getElementById('nombre').value.trim();
+            const telefono = document.getElementById('telefono').value;
+            const referencia = document.getElementById('referencia').value;
+            const fecha = document.getElementById('fecha').value;
+            const monto = document.getElementById('monto').value;
+
+            let valido = true;
+
+            // Limpiar todos los errores primero
+            document.querySelectorAll('.error').forEach(error => {
+                error.style.display = 'none';
+            });
+
+            // Validar nombre
+            if (!nombre) {
+                document.getElementById('errorNombre').style.display = 'block';
+                valido = false;
+            }
+
+            // Validar cédula (solo números)
+            if (!telefono || !/^\d+$/.test(telefono)) {
+                document.getElementById('errorTelefono').style.display = 'block';
+                valido = false;
+            } else if (!validarCedula(telefono)) {
+                // Validar si la cédula existe en la lista de usuarios válidos
+                document.getElementById('errorCedulaInvalida').style.display = 'block';
+                valido = false;
+            }
+
+            // Validar referencia (solo números y mínimo 6 caracteres)
+            if (!referencia || !/^\d+$/.test(referencia) || referencia.length < 6) {
+                document.getElementById('errorReferencia').style.display = 'block';
+                valido = false;
+            }
+
+            // Validar fecha
+            if (!fecha) {
+                document.getElementById('errorFecha').style.display = 'block';
+                valido = false;
+            } else {
+                // Verificar que la fecha no sea futura
+                const fechaSeleccionada = new Date(fecha);
+                const hoy = new Date();
+                hoy.setHours(0, 0, 0, 0);
+                
+                if (fechaSeleccionada > hoy) {
+                    document.getElementById('errorFecha').innerText = "La fecha no puede ser futura.";
+                    document.getElementById('errorFecha').style.display = 'block';
+                    valido = false;
+                }
+            }
+
+            // Validar monto
+            const montoNumerico = parseFloat(monto);
+            if (!monto || isNaN(montoNumerico) || montoNumerico <= 0) {
+                document.getElementById('errorMonto').style.display = 'block';
+                valido = false;
+            }
+
+            // Si todo es válido, enviar el mensaje
+            if (valido) {
+                enviarMensaje();
+            } else {
+                // Desplazar al primer error
+                const primerError = document.querySelector('.error[style="display: block;"]');
+                if (primerError) {
+                    primerError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        // Función para enviar el mensaje a GRUPO de WhatsApp
+        async function enviarMensaje() {
+            const nombre = document.getElementById('nombre').value.trim();
+            const telefono = document.getElementById('telefono').value;
+            const referencia = document.getElementById('referencia').value;
+            const fecha = document.getElementById('fecha').value;
+            const monto = document.getElementById('monto').value;
+            
+            // Deshabilitar el botón para evitar envíos múltiples
+            btnEnviar.disabled = true;
+            btnEnviar.textContent = 'Enviando...';
+            
+            // Formatear la fecha para mostrarla mejor
+            const fechaObj = new Date(fecha);
+            const fechaFormateada = fechaObj.toLocaleDateString('es-VE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+
+            // Formatear el monto en Bs. con separador de miles y 2 decimales
+            const montoFormateado = formatearMonto(monto);
+            
+            // Mensaje con monto en Bs. y formato venezolano
+            const mensaje = `📋 *NUEVO REPORTE DE PAGO*\n\n` +
+                           `👤 *Abonado:* ${nombre}\n` +
+                           `🆔 *Cédula:* ${telefono}\n` +
+                           `💰 *Monto:* Bs. ${montoFormateado}\n` +
+                           `📅 *Fecha:* ${fechaFormateada}\n` +
+                           `🔢 *Referencia:* ${referencia}\n\n` +
+                           `_Reporte generado desde el portal de pagos_`;
+
+            // ⭐⭐⭐ CONFIGURACIÓN PARA GRUPO DE WHATSAPP ⭐⭐⭐
+            // PASO 1: Agrega este número a tu grupo: +34 644 44 18 30
+            // PASO 2: Envía el mensaje: /new
+            // PASO 3: El bot te dará una API Key
+            // PASO 4: Reemplaza 'TU_API_KEY_AQUI' con tu API Key real
+            
+            const apiKey = '4460385'; // ⬅⬅⬅ REEMPLAZA ESTO CON TU API KEY DE GRUPO
+            
+            // URL para enviar a grupo (NO incluye parámetro phone=)
+            const urlCallMeBot = `https://api.callmebot.com/whatsapp.php?apikey=${apiKey}&text=${encodeURIComponent(mensaje)}`;
+
+            try {
+                // Mostrar mensaje de procesamiento
+                const mensajeRespuesta = document.getElementById('mensajeRespuesta');
+                mensajeRespuesta.innerText = "Enviando reporte de pago al grupo de WhatsApp...";
+                mensajeRespuesta.style.display = 'block';
+                
+                // Enviar mensaje al grupo de WhatsApp
+                await fetch(urlCallMeBot, { mode: 'no-cors' });
+                
+                // Ocultar el formulario y mostrar el mensaje de celebración
+                setTimeout(function() {
+                    document.getElementById('suspensionForm').style.display = 'none';
+                    mensajeRespuesta.style.display = 'none';
+                    document.getElementById('mensajeCelebracion').style.display = 'block';
+                    lanzarConfeti();
+                    
+                    // Reiniciar formulario después de 10 segundos
+                    setTimeout(function() {
+                        location.reload();
+                    }, 10000);
+                }, 1500);
+                
+            } catch (error) {
+                // Si hay un error, mostrar mensaje de éxito de todas formas
+                document.getElementById('suspensionForm').style.display = 'none';
+                document.getElementById('mensajeRespuesta').style.display = 'none';
+                document.getElementById('mensajeCelebracion').style.display = 'block';
+                lanzarConfeti();
+                
+                console.log("Reporte enviado al grupo de WhatsApp");
+                
+                // Reiniciar después de 10 segundos
+                setTimeout(function() {
+                    location.reload();
+                }, 10000);
+            }
+        }
+
+        // Función para lanzar confeti mejorado
+        function lanzarConfeti() {
+            // Confeti inicial
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.6 }
+            });
+            
+            // Confeti adicional después de un breve retraso
+            setTimeout(() => {
+                confetti({
+                    particleCount: 100,
+                    angle: 60,
+                    spread: 80,
+                    origin: { x: 0 }
+                });
+            }, 250);
+            
+            setTimeout(() => {
+                confetti({
+                    particleCount: 100,
+                    angle: 120,
+                    spread: 80,
+                    origin: { x: 1 }
+                });
+            }, 500);
+            
+            // Confeti continuo por unos segundos
+            const intervalo = setInterval(() => {
+                confetti({
+                    particleCount: 50,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }, 500);
+            
+            // Detener confeti después de 5 segundos
+            setTimeout(() => {
+                clearInterval(intervalo);
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
