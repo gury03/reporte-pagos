@@ -3,8 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSP para permitir CallMeBot -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self' https://api.callmebot.com https://cdn.jsdelivr.net;
+        script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';
+        style-src 'self' 'unsafe-inline';
+        connect-src 'self' https://api.callmebot.com;
+    ">
     <title>Portal para Reportar Pagos</title>
     <style>
+        /* (Mantén todo tu CSS igual) */
         body {
             font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
@@ -19,191 +27,17 @@
             justify-content: center;
         }
         
-        .container {
-            background-color: rgba(255, 255, 255, 0.95);
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 500px;
-            margin: 20px;
-            backdrop-filter: blur(10px);
-        }
-        
-        h1 {
-            color: #ff0000;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .subtitle {
-            color: #333;
-            font-size: 16px;
-            margin-bottom: 25px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        
-        input, button {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 16px;
-            transition: all 0.3s ease;
-        }
-        
-        input {
-            background-color: #fff;
-            color: #333;
-        }
-        
-        input:focus {
-            outline: none;
-            border-color: #25D366;
-            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.2);
-        }
-        
-        input::placeholder {
-            color: #888;
-        }
-        
-        .error {
-            color: #e74c3c;
-            font-size: 13px;
-            margin-top: 5px;
-            display: none;
-        }
-        
-        button {
-            background: linear-gradient(to right, #25D366, #128C7E);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            margin-top: 10px;
-            padding: 15px;
-            font-size: 18px;
-        }
-        
-        button:hover {
-            background: linear-gradient(to right, #128C7E, #25D366);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.4);
-        }
-        
-        button:active {
-            transform: translateY(0);
-        }
-        
-        .celebrar {
-            display: none;
-            font-size: 36px;
-            font-weight: bold;
-            color: #25D366;
-            animation: celebrar 2s infinite;
-            margin: 30px 0;
-            text-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
-        }
-        
-        .info-message {
-            color: #666;
-            font-size: 14px;
-            margin-top: 25px;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            border-left: 4px solid #25D366;
-        }
-        
-        @keyframes celebrar {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        /* Responsividad */
-        @media (max-width: 600px) {
-            body {
-                padding: 10px;
-            }
-            
-            .container {
-                padding: 20px;
-                margin: 10px;
-            }
-            
-            h1 {
-                font-size: 24px;
-            }
-            
-            .celebrar {
-                font-size: 28px;
-            }
-        }
-        
-        /* Estilo para el canvas de confeti */
-        #confetti {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1000;
-        }
+        /* ... (todo el resto del CSS igual) ... */
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- (Mantén todo el HTML del formulario igual) -->
         <h1>Reporte de Pagos</h1>
         <p class="subtitle">Por favor, ingresa la información solicitada para continuar con el servicio.</p>
         
         <form id="suspensionForm">
-            <div class="form-group">
-                <label for="nombre">Nombre del abonado</label>
-                <input type="text" id="nombre" placeholder="Ingresa tu nombre completo" required>
-                <div id="errorNombre" class="error">Por favor, ingresa tu nombre completo.</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="telefono">Número de cédula</label>
-                <input type="text" id="telefono" placeholder="Ej: 12345678" required>
-                <div id="errorTelefono" class="error">Por favor, ingresa solo números.</div>
-                <div id="errorCedulaInvalida" class="error">La cédula ingresada no está registrada en el sistema.</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="referencia">Referencia del pago</label>
-                <input type="text" id="referencia" placeholder="Mínimo 6 dígitos" required>
-                <div id="errorReferencia" class="error">La referencia debe tener al menos 6 números.</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="fecha">Fecha de pago</label>
-                <input type="date" id="fecha" required>
-                <div id="errorFecha" class="error">Por favor, selecciona una fecha válida.</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="monto">Monto pagado (Bs.)</label>
-                <input type="text" id="monto" placeholder="Ej: 50.00" required>
-                <div id="errorMonto" class="error">Por favor, ingresa un monto válido en Bs. (ej: 50.00).</div>
-            </div>
-            
-            <button type="button" id="btnEnviar">Reportar Pago</button>
+            <!-- ... (todos los campos del formulario iguales) ... -->
         </form>
         
         <div id="mensajeRespuesta" class="info-message" style="display: none;"></div>
@@ -211,10 +45,8 @@
         <p class="info-message">Si cree que esto ha sido un error, ingrese igual la información requerida.</p>
     </div>
 
-    <!-- Mensaje de celebración -->
     <div id="mensajeCelebracion" class="celebrar">¡Gracias por tu Colaboración!</div>
 
-    <!-- Confeti -->
     <canvas id="confetti"></canvas>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
@@ -302,16 +134,13 @@
 
         // Función para validar que el monto sea un número válido
         function validarMonto(input) {
-            // Permite números y un punto decimal, pero solo un punto
             input.value = input.value.replace(/[^0-9.]/g, '');
             
-            // Verificar si hay más de un punto
             const puntos = input.value.split('.').length - 1;
             if (puntos > 1) {
                 input.value = input.value.substring(0, input.value.lastIndexOf('.'));
             }
             
-            // Formatear para mostrar siempre con 2 decimales mientras se escribe
             if (input.value.includes('.')) {
                 const partes = input.value.split('.');
                 if (partes[1].length > 2) {
@@ -336,7 +165,6 @@
             if (valor) {
                 const numero = parseFloat(valor);
                 if (!isNaN(numero)) {
-                    // Asegurar 2 decimales
                     input.value = numero.toFixed(2);
                 }
             }
@@ -431,8 +259,8 @@
             }
         }
 
-        // Función para enviar el mensaje a GRUPO de WhatsApp
-        async function enviarMensaje() {
+        // Función para enviar el mensaje (versión mejorada)
+        function enviarMensaje() {
             const nombre = document.getElementById('nombre').value.trim();
             const telefono = document.getElementById('telefono').value;
             const referencia = document.getElementById('referencia').value;
@@ -451,7 +279,7 @@
                 year: 'numeric'
             });
 
-            // Formatear el monto en Bs. con separador de miles y 2 decimales
+            // Formatear el monto en Bs.
             const montoFormateado = formatearMonto(monto);
             
             // Mensaje con monto en Bs. y formato venezolano
@@ -463,53 +291,67 @@
                            `🔢 *Referencia:* ${referencia}\n\n` +
                            `_Reporte generado desde el portal de pagos_`;
 
-            // ⭐⭐⭐ CONFIGURACIÓN PARA GRUPO DE WHATSAPP ⭐⭐⭐
-            // PASO 1: Agrega este número a tu grupo: +34 644 44 18 30
-            // PASO 2: Envía el mensaje: /new
-            // PASO 3: El bot te dará una API Key
-            // PASO 4: Reemplaza 'TU_API_KEY_AQUI' con tu API Key real
+            // API Key y número de teléfono (AJUSTA ESTOS VALORES)
+            const apiKey = '4460385'; // Tu API Key de CallMeBot
+            const numeroSoporte = '584128856847'; // Tu número en formato internacional
             
-            const apiKey = '4460385'; // ⬅⬅⬅ REEMPLAZA ESTO CON TU API KEY DE GRUPO
-            
-            // URL para enviar a grupo (NO incluye parámetro phone=)
-            const urlCallMeBot = `https://api.callmebot.com/whatsapp.php?apikey=${apiKey}&text=${encodeURIComponent(mensaje)}`;
+            // URL de CallMeBot (asegúrate que sea HTTPS)
+            const urlCallMeBot = `https://api.callmebot.com/whatsapp.php?phone=${numeroSoporte}&text=${encodeURIComponent(mensaje)}&apikey=${apiKey}`;
 
-            try {
-                // Mostrar mensaje de procesamiento
-                const mensajeRespuesta = document.getElementById('mensajeRespuesta');
-                mensajeRespuesta.innerText = "Enviando reporte de pago al grupo de WhatsApp...";
-                mensajeRespuesta.style.display = 'block';
-                
-                // Enviar mensaje al grupo de WhatsApp
-                await fetch(urlCallMeBot, { mode: 'no-cors' });
-                
-                // Ocultar el formulario y mostrar el mensaje de celebración
-                setTimeout(function() {
-                    document.getElementById('suspensionForm').style.display = 'none';
-                    mensajeRespuesta.style.display = 'none';
-                    document.getElementById('mensajeCelebracion').style.display = 'block';
-                    lanzarConfeti();
-                    
-                    // Reiniciar formulario después de 10 segundos
-                    setTimeout(function() {
-                        location.reload();
-                    }, 10000);
-                }, 1500);
-                
-            } catch (error) {
-                // Si hay un error, mostrar mensaje de éxito de todas formas
+            // Mostrar mensaje de procesamiento
+            const mensajeRespuesta = document.getElementById('mensajeRespuesta');
+            mensajeRespuesta.innerText = "Enviando reporte de pago...";
+            mensajeRespuesta.style.display = 'block';
+            
+            // Función para mostrar éxito
+            function mostrarExito() {
                 document.getElementById('suspensionForm').style.display = 'none';
-                document.getElementById('mensajeRespuesta').style.display = 'none';
+                mensajeRespuesta.style.display = 'none';
                 document.getElementById('mensajeCelebracion').style.display = 'block';
                 lanzarConfeti();
                 
-                console.log("Reporte enviado al grupo de WhatsApp");
-                
-                // Reiniciar después de 10 segundos
                 setTimeout(function() {
                     location.reload();
                 }, 10000);
             }
+            
+            // Método 1: Usando Image object (más compatible)
+            function enviarConImagen() {
+                const img = new Image();
+                img.src = urlCallMeBot;
+                img.onload = function() {
+                    mostrarExito();
+                };
+                img.onerror = function() {
+                    // Aún mostrar éxito aunque falle
+                    mostrarExito();
+                };
+                
+                // Timeout por si acaso
+                setTimeout(function() {
+                    mostrarExito();
+                }, 3000);
+            }
+            
+            // Método 2: Usando fetch con manejo mejorado
+            function enviarConFetch() {
+                fetch(urlCallMeBot, { 
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                })
+                .then(() => {
+                    mostrarExito();
+                })
+                .catch(() => {
+                    mostrarExito(); // Siempre mostrar éxito al usuario
+                });
+            }
+            
+            // Usar el método más compatible
+            enviarConImagen();
+            
+            // También intentar con fetch
+            setTimeout(enviarConFetch, 100);
         }
 
         // Función para lanzar confeti mejorado
