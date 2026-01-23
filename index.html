@@ -661,8 +661,8 @@
                 const fecha = pago.fecha ? new Date(pago.fecha) : new Date();
                 const fechaFormateada = fecha.toLocaleDateString('es-VE');
                 
-                let montoBs = pago.monto || 0;
-                let montoUsd = montoBs / CONFIG.tasaCambio;
+                let montoBs = pago.monto_bs || pago.monto || 0;
+                let montoUsd = pago.monto_usd || (montoBs / CONFIG.tasaCambio);
                 
                 if (currentCurrency === 'USD') {
                     montoBs = montoUsd;
@@ -672,7 +672,7 @@
                     <td>${fechaFormateada}</td>
                     <td>${pago.mes || 'N/A'}</td>
                     <td>${formatCurrency(montoBs)} ${currentCurrency === 'USD' ? 'USD $' : 'Bs.'}</td>
-                    <td>${formatCurrency(pago.monto / CONFIG.tasaCambio)} USD</td>
+                    <td>${formatCurrency(montoUsd)} USD</td>
                     <td>${pago.referencia || 'N/A'}</td>
                     <td>${pago.metodo || 'Portal Web'}</td>
                 `;
@@ -811,6 +811,13 @@
                     document.getElementById('statusText').textContent = 'Conectado a H2';
                     document.getElementById('dbInfo').innerHTML = 
                         `Servidor: 54.232.39.174:9092 | Base: ${data.h2.database}`;
+                    
+                    // ACTUALIZAR TASA DE CAMBIO DESDE LA API
+                    if (data.tasa_cambio) {
+                        CONFIG.tasaCambio = data.tasa_cambio;
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
                 } else {
                     document.getElementById('statusIcon').style.color = '#f59e0b';
                     document.getElementById('statusText').textContent = 'API disponible, H2 no conectado';
@@ -850,7 +857,18 @@
                 if (data.success) {
                     // Guardar datos del usuario
                     currentUser = data.abonado;
-                    localStorage.setItem('portal_abonado', JSON.stringify(data.abonado));
+                    
+                    // ACTUALIZAR TASA DE CAMBIO DESDE LA RESPUESTA
+                    if (data.tasa_cambio) {
+                        CONFIG.tasaCambio = data.tasa_cambio;
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
+                    
+                    localStorage.setItem('portal_abonado', JSON.stringify({
+                        ...data.abonado,
+                        tasa_cambio: data.tasa_cambio
+                    }));
                     
                     // Mostrar dashboard
                     showMessage('loginMessage', '✅ Conexión exitosa a H2 Database', 'success');
@@ -859,13 +877,11 @@
                         showDashboard();
                         loadUserData();
                         
-                        // Cargar deudas y pagos si están en la respuesta
-                        if (data.deudas) {
-                            updateDebtDisplay(
-                                data.abonado.deuda_total || 0,
-                                data.deudas.map(d => d.mes).join(', ')
-                            );
-                        }
+                        // Usar deuda_total_bs en lugar de deuda_total
+                        updateDebtDisplay(
+                            data.abonado.deuda_total_bs || 0,
+                            data.deudas ? data.deudas.map(d => d.mes).join(', ') : ''
+                        );
                         
                         if (data.pagos) {
                             updatePaymentsTable(data.pagos);
@@ -1052,6 +1068,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
