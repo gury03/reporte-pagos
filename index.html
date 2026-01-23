@@ -6,6 +6,7 @@
     <title>Portal de Pagos ISP - Conexión Real H2</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* ESTILOS EXACTAMENTE IGUALES A LOS QUE TENÍAS */
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -343,8 +344,8 @@
                 </div>
                 
                 <div class="form-group">
-                    <label>Usuario PPPoE *</label>
-                    <input type="text" id="usuario_pppoe" placeholder="Ej: aura8765151">
+                    <label>Cédula / Código *</label>
+                    <input type="text" id="codigo" placeholder="Ej: 8765151">
                 </div>
                 
                 <div class="form-group">
@@ -562,7 +563,7 @@
             ]
         };
         
-        // ================= FUNCIONES DE INTERFAZ =================
+        // ================= FUNCIONES DE INTERFAZ (definidas primero) =================
         
         function showDashboard() {
             document.getElementById('loginSection').style.display = 'none';
@@ -578,7 +579,7 @@
             
             // Limpiar formularios
             document.getElementById('nombre').value = '';
-            document.getElementById('usuario_pppoe').value = '';
+            document.getElementById('codigo').value = '';
             document.getElementById('telefono').value = '';
             document.getElementById('referencia').value = '';
             document.getElementById('monto').value = '';
@@ -822,10 +823,10 @@
         
         async function login() {
             const nombre = document.getElementById('nombre').value.trim();
-            const usuario_pppoe = document.getElementById('usuario_pppoe').value.trim();
+            const codigo = document.getElementById('codigo').value.trim();
             const telefono = document.getElementById('telefono').value.trim();
             
-            if (!nombre || !usuario_pppoe || !telefono) {
+            if (!nombre || !codigo || !telefono) {
                 showMessage('loginMessage', 'Todos los campos son obligatorios', 'error');
                 return;
             }
@@ -841,11 +842,7 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ 
-                        nombre, 
-                        usuario_pppoe, 
-                        telefono 
-                    })
+                    body: JSON.stringify({ nombre, codigo, telefono })
                 });
                 
                 const data = await response.json();
@@ -866,7 +863,7 @@
                         if (data.deudas) {
                             updateDebtDisplay(
                                 data.abonado.deuda_total || 0,
-                                data.deudas.map(d => d.mes_deuda || d.mes).join(', ')
+                                data.deudas.map(d => d.mes).join(', ')
                             );
                         }
                         
@@ -895,10 +892,10 @@
         }
         
         async function loadDebts() {
-            if (!currentUser || !currentUser.id) return;
+            if (!currentUser) return;
             
             try {
-                const response = await fetch(`${CONFIG.apiUrl}/deudas/${currentUser.usuario_pppoe}`);
+                const response = await fetch(`${CONFIG.apiUrl}/deudas/${currentUser.codigo}`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -910,10 +907,10 @@
         }
         
         async function loadPayments() {
-            if (!currentUser || !currentUser.id) return;
+            if (!currentUser) return;
             
             try {
-                const response = await fetch(`${CONFIG.apiUrl}/pagos/${currentUser.usuario_pppoe}`);
+                const response = await fetch(`${CONFIG.apiUrl}/pagos/${currentUser.codigo}`);
                 const data = await response.json();
                 
                 if (data.success && data.pagos && data.pagos.length > 0) {
@@ -971,7 +968,6 @@
                            `💰 *NUEVO PAGO REPORTADO*\n` +
                            `👤 *Abonado:* ${currentUser.nombre}\n` +
                            `🆔 *Código:* ${currentUser.codigo}\n` +
-                           `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
                            `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
                            `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
                            `📅 *Fecha pago:* ${fechaFormateada}\n` +
@@ -1007,7 +1003,7 @@
             const formData = new FormData();
             formData.append('chat_id', CONFIG.telegram.chatId);
             formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
-            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | PPPoE: ${currentUser.usuario_pppoe} | Ref: ${pendingPayment.referencia}`);
+            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | Ref: ${pendingPayment.referencia}`);
             formData.append('parse_mode', 'Markdown');
             
             const response = await fetch(url + method, {
@@ -1056,5 +1052,6 @@
     </script>
 </body>
 </html>
+
 
 
