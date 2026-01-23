@@ -1015,21 +1015,37 @@
         }
         
         function showConfirmationModal() {
-            if (!currentUser || !pendingPayment) return;
+            console.log('🔍 Mostrando modal de confirmación:', {
+                currentUser: !!currentUser,
+                pendingPayment: pendingPayment,
+                uploadedFile: !!uploadedFile
+            });
             
-            const fechaObj = new Date(pendingPayment.fecha);
-            const fechaFormateada = fechaObj.toLocaleDateString('es-VE');
+            if (!currentUser) {
+                console.error('No hay usuario para mostrar confirmación');
+                return;
+            }
             
-            document.getElementById('confirmName').textContent = currentUser.nombre;
-            document.getElementById('confirmRef').textContent = pendingPayment.referencia;
-            document.getElementById('confirmDate').textContent = fechaFormateada;
-            document.getElementById('confirmAmount').textContent = formatCurrency(pendingPayment.monto) + ' Bs.';
+            if (!pendingPayment) {
+                console.error('No hay pago pendiente para mostrar confirmación');
+                return;
+            }
             
-            document.getElementById('confirmationModal').style.display = 'flex';
-        }
-        
-        function closeModal() {
-            document.getElementById('confirmationModal').style.display = 'none';
+            try {
+                const fechaObj = new Date(pendingPayment.fecha);
+                const fechaFormateada = fechaObj.toLocaleDateString('es-VE');
+                
+                document.getElementById('confirmName').textContent = currentUser.nombre || 'Sin nombre';
+                document.getElementById('confirmRef').textContent = pendingPayment.referencia || 'Sin referencia';
+                document.getElementById('confirmDate').textContent = fechaFormateada;
+                document.getElementById('confirmAmount').textContent = formatCurrency(pendingPayment.monto || 0) + ' Bs.';
+                
+                document.getElementById('confirmationModal').style.display = 'flex';
+                console.log('✅ Modal de confirmación mostrado');
+            } catch (error) {
+                console.error('Error mostrando modal de confirmación:', error);
+                showMessage('paymentMessage', 'Error al mostrar confirmación', 'error');
+            }
         }
         
         // ================= MANEJO DE ARCHIVOS =================
@@ -1076,6 +1092,8 @@
             const fecha = document.getElementById('fechaPago').value;
             const monto = document.getElementById('monto').value;
             
+            console.log('🔍 Validando pago:', { referencia, fecha, monto });
+            
             if (!referencia || referencia.length < 6) {
                 showMessage('paymentMessage', 'La referencia debe tener al menos 6 caracteres', 'error');
                 return;
@@ -1097,7 +1115,15 @@
                 return;
             }
             
-            pendingPayment = { referencia, fecha, monto: montoNum };
+            // Guardar datos del pago con más información
+            pendingPayment = { 
+                referencia, 
+                fecha, 
+                monto: montoNum,
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('✅ Pago validado:', pendingPayment);
             closePaymentModal();
             showConfirmationModal();
         }
@@ -1304,15 +1330,39 @@
         }
         
         async function sendToTelegram() {
-            if (!currentUser || !pendingPayment || !uploadedFile) {
-                console.error('Faltan datos para enviar a Telegram');
-                showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
+            console.log('🔍 Verificando datos para Telegram:', {
+                currentUser: !!currentUser,
+                pendingPayment: pendingPayment,
+                uploadedFile: !!uploadedFile,
+                currentUserNombre: currentUser?.nombre,
+                currentUserCodigo: currentUser?.codigo,
+                pendingPaymentRef: pendingPayment?.referencia
+            });
+            
+            if (!currentUser) {
+                console.error('❌ No hay usuario actual');
+                showMessage('paymentMessage', '❌ No hay sesión de usuario activa', 'error');
+                closeModal();
+                return;
+            }
+            
+            if (!pendingPayment) {
+                console.error('❌ No hay datos de pago pendientes');
+                showMessage('paymentMessage', '❌ No hay datos de pago para enviar', 'error');
+                closeModal();
+                return;
+            }
+            
+            if (!uploadedFile) {
+                console.error('❌ No hay archivo subido');
+                showMessage('paymentMessage', '❌ Debes subir un comprobante de pago', 'error');
+                closeModal();
                 return;
             }
             
             const btn = document.getElementById('btnConfirmTelegram');
             if (!btn) {
-                console.error('No se encontró el botón btnConfirmTelegram');
+                console.error('❌ No se encontró el botón de confirmación');
                 return;
             }
             
@@ -1323,104 +1373,141 @@
                 console.log('📤 Iniciando envío a Telegram...');
                 
                 // 1. Enviar mensaje a Telegram
-                await sendTelegramMessage();
+                const messageSent = await sendTelegramMessage();
+                if (!messageSent) {
+                    throw new Error('No se pudo enviar el mensaje a Telegram');
+                }
                 
                 // 2. Enviar archivo a Telegram
-                await sendTelegramFile();
+                const fileSent = await sendTelegramFile();
+                if (!fileSent) {
+                    throw new Error('No se pudo enviar el archivo a Telegram');
+                }
                 
-                showMessage('paymentMessage', '✅ Reporte enviado exitosamente a Telegram', 'success');
-                
-                // 3. Limpiar formulario
+                // 3. Limpiar datos pendientes
+                pendingPayment = null;
+                uploadedFile = null;
                 document.getElementById('referencia').value = '';
                 document.getElementById('monto').value = '';
                 removeFile();
                 
-                // 4. Recargar datos
-                setTimeout(() => {
-                    loadDebts();
-                    loadPayments();
-                }, 2000);
+                // 4. Mostrar mensaje de éxito
+                showMessage('paymentMessage', '✅ Reporte enviado exitosamente a Telegram', 'success');
                 
                 // 5. Cerrar modal
                 closeModal();
                 
+                // 6. Recargar datos después de un breve delay
+                setTimeout(() => {
+                    if (currentUser) {
+                        loadDebts();
+                        loadPayments();
+                    }
+                }, 1500);
+                
             } catch (error) {
-                console.error('Error enviando a Telegram:', error);
+                console.error('❌ Error enviando a Telegram:', error);
                 showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
+            } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
             }
         }
         
         async function sendTelegramMessage() {
-            const { referencia, fecha, monto } = pendingPayment;
-            const fechaFormateada = new Date(fecha).toLocaleDateString('es-VE');
-            const hora = new Date().toLocaleTimeString('es-VE');
-            
-            const mensaje = `━━━━━━━━━━━━━━━━━━━━\n` +
-                           `💰 *NUEVO PAGO REPORTADO*\n` +
-                           `👤 *Abonado:* ${currentUser.nombre}\n` +
-                           `🆔 *Código:* ${currentUser.codigo}\n` +
-                           `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
-                           `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
-                           `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
-                           `📅 *Fecha pago:* ${fechaFormateada}\n` +
-                           `🔢 *Referencia:* ${referencia}\n` +
-                           `⏰ *Hora:* ${hora}\n` +
-                           `📊 *Tasa cambio:* ${CONFIG.tasaCambio.toFixed(2)} Bs./USD\n` +
-                           `━━━━━━━━━━━━━━━━━━━━\n`;
-            
-            const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`;
-            
-            console.log('📨 Enviando mensaje a Telegram...');
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: CONFIG.telegram.chatId,
-                    text: mensaje,
-                    parse_mode: 'Markdown'
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (!data.ok) {
-                throw new Error(data.description || 'Error de Telegram');
+            try {
+                const { referencia, fecha, monto } = pendingPayment;
+                const fechaFormateada = new Date(fecha).toLocaleDateString('es-VE');
+                const hora = new Date().toLocaleTimeString('es-VE');
+                
+                const mensaje = `━━━━━━━━━━━━━━━━━━━━\n` +
+                            `💰 *NUEVO PAGO REPORTADO*\n` +
+                            `👤 *Abonado:* ${currentUser.nombre}\n` +
+                            `🆔 *Código:* ${currentUser.codigo}\n` +
+                            `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
+                            `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
+                            `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
+                            `📅 *Fecha pago:* ${fechaFormateada}\n` +
+                            `🔢 *Referencia:* ${referencia}\n` +
+                            `⏰ *Hora:* ${hora}\n` +
+                            `📊 *Tasa cambio:* ${CONFIG.tasaCambio.toFixed(2)} Bs./USD\n` +
+                            `━━━━━━━━━━━━━━━━━━━━\n`;
+                
+                const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`;
+                
+                console.log('📨 Enviando mensaje a Telegram:', {
+                    url: url.replace(CONFIG.telegram.botToken, 'TOKEN_OCULTO'),
+                    chatId: CONFIG.telegram.chatId,
+                    referencia: referencia
+                });
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: CONFIG.telegram.chatId,
+                        text: mensaje,
+                        parse_mode: 'Markdown'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.ok) {
+                    console.error('❌ Error de Telegram:', data);
+                    throw new Error(data.description || 'Error de Telegram');
+                }
+                
+                console.log('✅ Mensaje enviado a Telegram:', data);
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Error en sendTelegramMessage:', error);
+                throw error;
             }
-            
-            console.log('✅ Mensaje enviado a Telegram');
         }
         
         async function sendTelegramFile() {
-            if (!uploadedFile) {
-                throw new Error('No hay archivo para enviar');
+            try {
+                if (!uploadedFile) {
+                    throw new Error('No hay archivo para enviar');
+                }
+                
+                const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
+                const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
+                
+                const formData = new FormData();
+                formData.append('chat_id', CONFIG.telegram.chatId);
+                formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
+                formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | PPPoE: ${currentUser.usuario_pppoe} | Ref: ${pendingPayment.referencia}`);
+                formData.append('parse_mode', 'Markdown');
+                
+                console.log('📎 Enviando archivo a Telegram:', {
+                    method: method,
+                    fileName: uploadedFile.name,
+                    fileSize: uploadedFile.size,
+                    fileType: uploadedFile.type
+                });
+                
+                const response = await fetch(url + method, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!data.ok) {
+                    console.error('❌ Error de Telegram (archivo):', data);
+                    throw new Error(data.description || 'Error subiendo archivo');
+                }
+                
+                console.log('✅ Archivo enviado a Telegram:', data);
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Error en sendTelegramFile:', error);
+                throw error;
             }
-            
-            const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
-            const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
-            
-            const formData = new FormData();
-            formData.append('chat_id', CONFIG.telegram.chatId);
-            formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
-            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | PPPoE: ${currentUser.usuario_pppoe} | Ref: ${pendingPayment.referencia}`);
-            formData.append('parse_mode', 'Markdown');
-            
-            console.log('📎 Enviando archivo a Telegram...');
-            
-            const response = await fetch(url + method, {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (!data.ok) {
-                throw new Error(data.description || 'Error subiendo archivo');
-            }
-            
-            console.log('✅ Archivo enviado a Telegram');
         }
         
         // ================= INICIALIZACIÓN =================
@@ -1481,3 +1568,7 @@
     </script>
 </body>
 </html>
+    </script>
+</body>
+</html>
+
