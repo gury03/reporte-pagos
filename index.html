@@ -6,7 +6,6 @@
     <title>Portal de Pagos ISP - Conexión Real H2</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ESTILOS EXACTAMENTE IGUALES A LOS QUE TENÍAS */
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -17,6 +16,7 @@
             --light: #f8fafc;
             --dark: #1e293b;
             --gray: #64748b;
+            --gray-light: #e2e8f0;
         }
 
         * {
@@ -116,7 +116,7 @@
         input {
             width: 100%;
             padding: 14px;
-            border: 2px solid #e2e8f0;
+            border: 2px solid var(--gray-light);
             border-radius: 8px;
             font-size: 16px;
             transition: all 0.3s;
@@ -172,13 +172,6 @@
             display: block;
         }
 
-        .message.info {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #bfdbfe;
-            display: block;
-        }
-
         .dashboard-section {
             display: none;
             padding: 30px;
@@ -205,16 +198,16 @@
             margin-bottom: 5px;
         }
 
-        .debt-card {
+        .card {
             background: white;
-            border: 2px solid #e2e8f0;
+            border: 2px solid var(--gray-light);
             border-radius: 12px;
             padding: 25px;
             margin-bottom: 30px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         }
 
-        .debt-header {
+        .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -224,7 +217,7 @@
         .debt-amount {
             text-align: center;
             padding: 30px;
-            background: #f8fafc;
+            background: var(--light);
             border-radius: 12px;
             margin-bottom: 20px;
         }
@@ -245,6 +238,46 @@
             color: var(--success);
         }
 
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-box {
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .info-box.plan {
+            background: #e0f2fe;
+            border-left-color: #0ea5e9;
+        }
+
+        .info-box.fee {
+            background: #dcfce7;
+            border-left-color: #22c55e;
+        }
+
+        .info-box.status {
+            background: #fef3c7;
+            border-left-color: #f59e0b;
+        }
+
+        .info-box-label {
+            font-size: 14px;
+            color: #0c4a6e;
+            margin-bottom: 5px;
+        }
+
+        .info-box-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0369a1;
+        }
+
         .payments-table {
             width: 100%;
             border-collapse: collapse;
@@ -261,11 +294,11 @@
 
         .payments-table td {
             padding: 15px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--gray-light);
         }
 
         .payments-table tr:hover {
-            background: #f8fafc;
+            background: var(--light);
         }
 
         .modal {
@@ -279,14 +312,55 @@
             align-items: center;
             justify-content: center;
             z-index: 1000;
+            padding: 20px;
         }
 
         .modal-content {
             background: white;
             border-radius: 12px;
             max-width: 500px;
-            width: 90%;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
             padding: 30px;
+        }
+
+        .payment-method-card {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px solid var(--gray-light);
+        }
+
+        .copy-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+            transition: all 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .copy-btn.success {
+            background: var(--success);
+        }
+
+        .payment-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
         }
 
         @media (max-width: 768px) {
@@ -304,11 +378,55 @@
                 gap: 20px;
             }
             
-            .debt-header {
+            .card-header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 15px;
             }
+            
+            .debt-total {
+                font-size: 36px;
+            }
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .action-buttons button {
+            width: auto;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+        }
+
+        .btn-secondary {
+            background: var(--gray);
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--gray);
+            cursor: pointer;
+            width: auto;
+            padding: 5px;
+        }
+
+        .close-btn:hover {
+            color: var(--dark);
         }
     </style>
 </head>
@@ -381,8 +499,8 @@
             </div>
 
             <!-- Debt Summary -->
-            <div class="debt-card">
-                <div class="debt-header">
+            <div class="card">
+                <div class="card-header">
                     <h2><i class="fas fa-file-invoice-dollar"></i> Estado de Cuenta</h2>
                     <div>
                         <button onclick="switchCurrency('BS')" id="btnBs" style="width: auto; margin-right: 10px; background: var(--primary);">Bs.</button>
@@ -403,70 +521,34 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
-                    <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; border-left: 4px solid #0ea5e9;">
-                        <div style="font-size: 14px; color: #0c4a6e;">Plan actual</div>
-                        <div style="font-size: 18px; font-weight: 600; color: #0369a1;" id="userPlan">Consultando...</div>
+                <div class="info-grid">
+                    <div class="info-box plan">
+                        <div class="info-box-label">Plan actual</div>
+                        <div class="info-box-value" id="userPlan">Consultando...</div>
                     </div>
-                    <div style="background: #dcfce7; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e;">
-                        <div style="font-size: 14px; color: #166534;">Mensualidad</div>
-                        <div style="font-size: 18px; font-weight: 600; color: #15803d;" id="monthlyFee">0,00</div>
+                    <div class="info-box fee">
+                        <div class="info-box-label">Mensualidad</div>
+                        <div class="info-box-value" id="monthlyFee">0,00</div>
                     </div>
-                    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                        <div style="font-size: 14px; color: #92400e;">Estado</div>
-                        <div style="font-size: 18px; font-weight: 600; color: #b45309;" id="userStatus">Consultando...</div>
+                    <div class="info-box status">
+                        <div class="info-box-label">Estado</div>
+                        <div class="info-box-value" id="userStatus">Consultando...</div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Payment Form -->
-            <div class="debt-card">
-                <h2><i class="fas fa-credit-card"></i> Reportar Nuevo Pago</h2>
-                
-                <div id="paymentMessage" class="message"></div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-                    <div>
-                        <label>Referencia *</label>
-                        <input type="text" id="referencia" placeholder="Ej: TRF-001234">
-                    </div>
-                    <div>
-                        <label>Fecha de pago *</label>
-                        <input type="date" id="fechaPago">
-                    </div>
-                    <div>
-                        <label>Monto (Bs.) *</label>
-                        <input type="number" id="monto" placeholder="50.00" step="0.01">
-                    </div>
-                    <div>
-                        <label>Mes que paga *</label>
-                        <input type="month" id="mesPago">
-                    </div>
+                <!-- Botón para registrar pago -->
+                <div class="action-buttons">
+                    <button onclick="showPaymentModal()" class="btn-primary">
+                        <i class="fas fa-credit-card"></i> Registrar Pago
+                    </button>
+                    <button onclick="loadDebts()" class="btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Actualizar Deuda
+                    </button>
                 </div>
-                
-                <div style="margin: 20px 0;">
-                    <label>Comprobante de pago *</label>
-                    <div style="border: 2px dashed #cbd5e0; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer;" onclick="document.getElementById('comprobante').click()">
-                        <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--primary); margin-bottom: 10px;"></i>
-                        <div>Haz clic para subir comprobante</div>
-                        <div style="font-size: 14px; color: var(--gray); margin-top: 5px;">Formatos: JPG, PNG, PDF - Máx: 10MB</div>
-                    </div>
-                    <input type="file" id="comprobante" accept="image/*,.pdf" style="display: none;">
-                    <div id="fileInfo" style="margin-top: 10px; padding: 10px; background: #f8fafc; border-radius: 8px; display: none;">
-                        <span id="fileName"></span> (<span id="fileSize"></span>)
-                        <button onclick="removeFile()" style="float: right; background: var(--danger); padding: 5px 10px; font-size: 12px; border: none; color: white; border-radius: 4px; cursor: pointer;">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <button id="btnSendPayment" onclick="validatePayment()">
-                    <i class="fas fa-paper-plane"></i> Enviar Reporte a Telegram
-                </button>
             </div>
 
             <!-- Payments History -->
-            <div class="debt-card">
+            <div class="card">
                 <h2><i class="fas fa-history"></i> Historial de Pagos</h2>
                 
                 <div id="historyMessage" class="message"></div>
@@ -498,13 +580,136 @@
         </div>
     </div>
 
+    <!-- Modal para Registrar Pago -->
+    <div class="modal" id="paymentModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closePaymentModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <h2><i class="fas fa-credit-card"></i> Registrar Pago</h2>
+            <p>Completa los datos para reportar tu pago</p>
+            
+            <div id="paymentMessage" class="message"></div>
+            
+            <!-- Datos para Pago Móvil -->
+            <div class="payment-method-card">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">
+                    <i class="fas fa-mobile-alt"></i> Datos para Pago Móvil
+                </h3>
+                
+                <div class="payment-detail">
+                    <div>
+                        <strong>Cédula/RIF:</strong>
+                        <span id="pagoMovilCedula" style="font-weight: bold; color: var(--dark);">16318027</span>
+                    </div>
+                    <button class="copy-btn" onclick="copyToClipboard('16318027', 'pagoMovilCedulaBtn')" id="pagoMovilCedulaBtn">
+                        <i class="fas fa-copy"></i> Copiar
+                    </button>
+                </div>
+                
+                <div class="payment-detail">
+                    <div>
+                        <strong>Teléfono:</strong>
+                        <span id="pagoMovilTelefono" style="font-weight: bold; color: var(--dark);">04261308075</span>
+                    </div>
+                    <button class="copy-btn" onclick="copyToClipboard('04261308075', 'pagoMovilTelefonoBtn')" id="pagoMovilTelefonoBtn">
+                        <i class="fas fa-copy"></i> Copiar
+                    </button>
+                </div>
+                
+                <div class="payment-detail">
+                    <div>
+                        <strong>Banco:</strong>
+                        <span id="pagoMovilBanco" style="font-weight: bold; color: var(--dark);">0102 Venezuela</span>
+                    </div>
+                    <button class="copy-btn" onclick="copyToClipboard('0102 Venezuela', 'pagoMovilBancoBtn')" id="pagoMovilBancoBtn">
+                        <i class="fas fa-copy"></i> Copiar
+                    </button>
+                </div>
+                
+                <div class="payment-detail">
+                    <div>
+                        <strong>Monto a pagar:</strong>
+                        <span id="pagoMovilMonto" style="font-weight: bold; color: var(--danger); font-size: 18px;">0,00 Bs.</span>
+                    </div>
+                    <button class="copy-btn" onclick="copyMonto()" id="pagoMovilMontoBtn">
+                        <i class="fas fa-copy"></i> Copiar
+                    </button>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 15px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid var(--primary);">
+                    <p style="font-size: 14px; color: var(--gray); margin: 0;">
+                        <i class="fas fa-info-circle"></i> 
+                        Realiza el pago móvil con estos datos y luego completa el formulario con la referencia
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Formulario para reportar pago -->
+            <div style="margin-top: 25px;">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">
+                    <i class="fas fa-file-invoice"></i> Reportar Pago Realizado
+                </h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                    <div>
+                        <label>Referencia *</label>
+                        <input type="text" id="referencia" placeholder="Ej: TRF-001234">
+                    </div>
+                    <div>
+                        <label>Fecha de pago *</label>
+                        <input type="date" id="fechaPago">
+                    </div>
+                    <div>
+                        <label>Mes que paga *</label>
+                        <input type="month" id="mesPago">
+                    </div>
+                    <div>
+                        <label>Monto pagado (Bs.) *</label>
+                        <input type="number" id="monto" placeholder="50.00" step="0.01">
+                    </div>
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <label>Comprobante de pago *</label>
+                    <div style="border: 2px dashed var(--gray-light); border-radius: 8px; padding: 30px; text-align: center; cursor: pointer;" onclick="document.getElementById('comprobante').click()">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--primary); margin-bottom: 10px;"></i>
+                        <div>Haz clic para subir comprobante</div>
+                        <div style="font-size: 14px; color: var(--gray); margin-top: 5px;">Formatos: JPG, PNG, PDF - Máx: 10MB</div>
+                    </div>
+                    <input type="file" id="comprobante" accept="image/*,.pdf" style="display: none;">
+                    <div id="fileInfo" style="margin-top: 10px; padding: 10px; background: var(--light); border-radius: 8px; display: none;">
+                        <span id="fileName"></span> (<span id="fileSize"></span>)
+                        <button onclick="removeFile()" style="float: right; background: var(--danger); padding: 5px 10px; font-size: 12px; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button onclick="closePaymentModal()" class="btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button onclick="validatePayment()" class="btn-success" id="btnSendPayment">
+                        <i class="fas fa-paper-plane"></i> Enviar Reporte
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Confirmación -->
     <div class="modal" id="confirmationModal">
         <div class="modal-content">
+            <button class="close-btn" onclick="closeModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            
             <h2><i class="fas fa-check-circle"></i> Confirmar Envío</h2>
             <p>Revisa la información antes de enviar a Telegram:</p>
             
-            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <div style="background: var(--light); padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p><strong>Abonado:</strong> <span id="confirmName"></span></p>
                 <p><strong>Referencia:</strong> <span id="confirmRef"></span></p>
                 <p><strong>Fecha:</strong> <span id="confirmDate"></span></p>
@@ -512,9 +717,9 @@
                 <p><strong>Monto:</strong> <span id="confirmAmount" style="color: var(--success); font-weight: bold;"></span></p>
             </div>
             
-            <div style="display: flex; gap: 15px;">
-                <button onclick="closeModal()" style="background: var(--gray);">Cancelar</button>
-                <button onclick="sendToTelegram()" style="background: var(--success);">Enviar a Telegram</button>
+            <div class="action-buttons">
+                <button onclick="closeModal()" class="btn-secondary">Cancelar</button>
+                <button onclick="sendToTelegram()" class="btn-success">Enviar a Telegram</button>
             </div>
         </div>
     </div>
@@ -530,8 +735,6 @@
         const CONFIG = {
             // URL de tu API en AWS (DIRECTA - sin proxy)
             apiUrl: 'https://holy-credit-b4ed.thecrow859.workers.dev/api',
-            
-            useLocalFallback: false,
             
             // Telegram
             telegram: {
@@ -569,42 +772,38 @@
         function loadUserData() {
             if (!currentUser) return;
             
-            console.log('📊 Cargando datos del usuario:', currentUser); // Para debug
+            console.log('📊 Cargando datos del usuario:', currentUser);
             
             // Actualizar información básica
             document.getElementById('userName').textContent = currentUser.nombre;
             document.getElementById('userCode').textContent = currentUser.codigo;
             document.getElementById('userPppoe').textContent = currentUser.usuario_pppoe || 'No asignado';
             
-            // ZONA - CORREGIDO
+            // ZONA
             const zonaNombre = currentUser.zona_nombre || 'Sin zona';
             document.getElementById('userZone').textContent = zonaNombre;
-            console.log(`📍 Zona asignada: ${zonaNombre}`);
             
-            // PLAN - CORREGIDO
+            // PLAN
             const planNombre = currentUser.plan_nombre || 'Sin plan';
             document.getElementById('userPlan').textContent = planNombre;
-            console.log(`💵 Plan asignado: ${planNombre}`);
             
             // ESTADO
             const estado = currentUser.estado || 'Desconocido';
             document.getElementById('userStatus').textContent = estado;
             
-            // MENSUALIDAD - CORREGIDO
+            // MENSUALIDAD
             if (currentUser.plan_precio !== undefined && currentUser.plan_precio !== null) {
-                // plan_precio está en BOLÍVARES (ya convertido por la API)
                 const precioBs = parseFloat(currentUser.plan_precio);
                 updateMonthlyFeeDisplay(precioBs);
-                console.log(`💰 Mensualidad: ${precioBs} Bs.`);
             } else if (currentUser.plan_precio_bs !== undefined && currentUser.plan_precio_bs !== null) {
-                // fallback a plan_precio_bs
                 const precioBs = parseFloat(currentUser.plan_precio_bs);
                 updateMonthlyFeeDisplay(precioBs);
-                console.log(`💰 Mensualidad (fallback): ${precioBs} Bs.`);
             } else {
                 document.getElementById('monthlyFee').textContent = '0,00 Bs.';
-                console.log('⚠️  No se encontró precio de plan');
             }
+            
+            // Actualizar monto para pago móvil
+            updatePagoMovilMonto();
         }
         
         function updateMonthlyFeeDisplay(precioBs) {
@@ -613,7 +812,6 @@
             let symbol = 'Bs.';
             
             if (currentCurrency === 'USD') {
-                // Convertir a dólares usando la tasa actual
                 displayAmount = precioBs / CONFIG.tasaCambio;
                 symbol = 'USD $';
             }
@@ -662,7 +860,6 @@
             let currencySymbol = 'Bs.';
             
             if (currentCurrency === 'USD') {
-                // Convertir a dólares usando la tasa actual
                 displayAmount = totalBs / CONFIG.tasaCambio;
                 currencySymbol = 'USD $';
             }
@@ -677,7 +874,19 @@
                 monthsElement.textContent = `Meses pendientes: ${meses || 'Consultando...'}`;
             }
             
-            console.log(`💳 Deuda: ${totalBs} Bs. = ${(totalBs/CONFIG.tasaCambio).toFixed(2)} USD (Tasa: ${CONFIG.tasaCambio}) Moneda: ${currentCurrency}`);
+            // Actualizar monto para pago móvil
+            updatePagoMovilMonto();
+        }
+        
+        function updatePagoMovilMonto() {
+            if (currentUser && currentUser.deuda_total_bs !== undefined) {
+                const montoBs = currentUser.deuda_total_bs;
+                const montoElement = document.getElementById('pagoMovilMonto');
+                montoElement.textContent = formatCurrency(montoBs) + ' Bs.';
+                
+                // También actualizar el campo de monto en el formulario
+                document.getElementById('monto').value = montoBs.toFixed(2);
+            }
         }
         
         function showNoPayments() {
@@ -729,6 +938,48 @@
             document.getElementById('noPayments').style.display = 'none';
         }
         
+        // ================= MODALES =================
+        
+        function showPaymentModal() {
+            // Actualizar monto en el modal
+            updatePagoMovilMonto();
+            
+            // Configurar fecha actual
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fechaPago').value = today;
+            document.getElementById('mesPago').value = today.slice(0, 7);
+            document.getElementById('mesPago').max = today.slice(0, 7);
+            
+            // Mostrar modal
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+        
+        function closePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+            document.getElementById('paymentMessage').style.display = 'none';
+            document.getElementById('referencia').value = '';
+            removeFile();
+        }
+        
+        function showConfirmationModal() {
+            if (!currentUser || !pendingPayment) return;
+            
+            const fechaObj = new Date(pendingPayment.fecha);
+            const fechaFormateada = fechaObj.toLocaleDateString('es-VE');
+            
+            document.getElementById('confirmName').textContent = currentUser.nombre;
+            document.getElementById('confirmRef').textContent = pendingPayment.referencia;
+            document.getElementById('confirmDate').textContent = fechaFormateada;
+            document.getElementById('confirmMonth').textContent = pendingPayment.mes;
+            document.getElementById('confirmAmount').textContent = formatCurrency(pendingPayment.monto) + ' Bs.';
+            
+            document.getElementById('confirmationModal').style.display = 'flex';
+        }
+        
+        function closeModal() {
+            document.getElementById('confirmationModal').style.display = 'none';
+        }
+        
         // ================= MANEJO DE ARCHIVOS =================
         function handleFileUpload(event) {
             const file = event.target.files[0];
@@ -767,6 +1018,32 @@
             return (bytes / 1048576).toFixed(2) + ' MB';
         }
         
+        // ================= FUNCIONES DE COPIA =================
+        function copyToClipboard(text, buttonId) {
+            navigator.clipboard.writeText(text).then(() => {
+                const button = document.getElementById(buttonId);
+                const originalHTML = button.innerHTML;
+                
+                button.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                button.classList.add('success');
+                
+                setTimeout(() => {
+                    button.innerHTML = originalHTML;
+                    button.classList.remove('success');
+                }, 2000);
+                
+                showMessage('paymentMessage', '✅ Texto copiado al portapapeles', 'success');
+            }).catch(err => {
+                console.error('Error al copiar: ', err);
+                showMessage('paymentMessage', '❌ Error al copiar al portapapeles', 'error');
+            });
+        }
+        
+        function copyMonto() {
+            const montoText = document.getElementById('pagoMovilMonto').textContent;
+            copyToClipboard(montoText, 'pagoMovilMontoBtn');
+        }
+        
         // ================= VALIDACIÓN DE PAGO =================
         function validatePayment() {
             const referencia = document.getElementById('referencia').value.trim();
@@ -801,26 +1078,8 @@
             }
             
             pendingPayment = { referencia, fecha, monto: montoNum, mes };
+            closePaymentModal();
             showConfirmationModal();
-        }
-        
-        function showConfirmationModal() {
-            if (!currentUser || !pendingPayment) return;
-            
-            const fechaObj = new Date(pendingPayment.fecha);
-            const fechaFormateada = fechaObj.toLocaleDateString('es-VE');
-            
-            document.getElementById('confirmName').textContent = currentUser.nombre;
-            document.getElementById('confirmRef').textContent = pendingPayment.referencia;
-            document.getElementById('confirmDate').textContent = fechaFormateada;
-            document.getElementById('confirmMonth').textContent = pendingPayment.mes;
-            document.getElementById('confirmAmount').textContent = formatCurrency(pendingPayment.monto) + ' Bs.';
-            
-            document.getElementById('confirmationModal').style.display = 'flex';
-        }
-        
-        function closeModal() {
-            document.getElementById('confirmationModal').style.display = 'none';
         }
         
         // ================= FUNCIONES UTILITARIAS =================
@@ -862,7 +1121,6 @@
                         CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
-                        console.log(`💰 Tasa actualizada desde /health: ${CONFIG.tasaCambio}`);
                     }
                 } else {
                     document.getElementById('statusIcon').style.color = '#f59e0b';
@@ -903,15 +1161,14 @@
                 console.log('📊 Respuesta API login:', data);
                 
                 if (data.success) {
-                    // ACTUALIZAR TASA DE CAMBIO PRIMERO
+                    // ACTUALIZAR TASA DE CAMBIO
                     if (data.tasa_cambio) {
                         CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
-                        console.log(`💰 Tasa actualizada en login: ${CONFIG.tasaCambio}`);
                     }
                     
-                    // Guardar datos del usuario CON la tasa
+                    // Guardar datos del usuario
                     currentUser = {
                         ...data.abonado,
                         tasa_cambio: data.tasa_cambio,
@@ -989,9 +1246,11 @@
                     }));
                     
                     updateDebtDisplay(data.deuda_total_bs, data.meses_deuda);
+                    showMessage('debtMessage', '✅ Deuda actualizada correctamente', 'success');
                 }
             } catch (error) {
                 console.error('Error cargando deudas:', error);
+                showMessage('debtMessage', '❌ Error al actualizar la deuda', 'error');
             }
         }
         
@@ -1056,7 +1315,7 @@
                 showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Reporte a Telegram';
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Reporte';
             }
         }
         
@@ -1122,19 +1381,10 @@
         
         // ================= INICIALIZACIÓN =================
         document.addEventListener('DOMContentLoaded', function() {
-            // Configurar fechas
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('fechaPago').value = today;
-            document.getElementById('mesPago').value = today.slice(0, 7);
-            document.getElementById('mesPago').max = today.slice(0, 7);
-            
-            // Mostrar tasa de cambio inicial
-            document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
-            
             // Configurar eventos
             document.getElementById('comprobante').addEventListener('change', handleFileUpload);
             
-            // Verificar conexión a la API (actualizará la tasa)
+            // Verificar conexión a la API
             checkApiConnection();
             
             // Verificar sesión guardada
@@ -1167,13 +1417,12 @@
                 }
             }
             
-            // Debug: Verificar tasa cada 30 segundos
+            // Verificar tasa cada 30 segundos
             setInterval(async () => {
                 try {
                     const response = await fetch(`${CONFIG.apiUrl}/tasa-cambio`);
                     const data = await response.json();
                     if (data.success && data.tasa_cambio !== CONFIG.tasaCambio) {
-                        console.log(`🔄 Tasa actualizada en background: ${data.tasa_cambio}`);
                         CONFIG.tasaCambio = data.tasa_cambio;
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
