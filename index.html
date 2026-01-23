@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Pagos ISP - Conexión Real H2</title>
+    <title>Portal de Pagos ISP - Conectando con el mundo</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -333,23 +333,26 @@
             border: 2px solid var(--gray-light);
         }
 
-        .copy-btn {
+        .copy-all-btn {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 12px 20px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
-            margin-left: 10px;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 15px;
             transition: all 0.3s;
         }
 
-        .copy-btn:hover {
+        .copy-all-btn:hover {
             background: var(--primary-dark);
+            transform: translateY(-2px);
         }
 
-        .copy-btn.success {
+        .copy-all-btn.success {
             background: var(--success);
         }
 
@@ -437,7 +440,7 @@
                 <i class="fas fa-database"></i>
                 <div>
                     <h1>Portal de Pagos ISP</h1>
-                    <p>Conexión Real a Base de Datos H2</p>
+                    <p>Conectando con el mundo</p>
                 </div>
             </div>
             <div id="serverStatus">
@@ -472,13 +475,12 @@
                 </div>
                 
                 <button id="btnLogin" onclick="login()">
-                    <i class="fas fa-database"></i> Conectar a Base de Datos
+                    <i class="fas fa-search"></i> Consultar
                 </button>
                 
                 <div style="margin-top: 30px; padding: 20px; background: #f1f5f9; border-radius: 8px; font-size: 14px; color: #64748b;">
                     <p><strong><i class="fas fa-info-circle"></i> Información:</strong></p>
-                    <p>Conexión real a H2 Database en AWS</p>
-                    <p id="dbInfo">Servidor: 54.232.39.174 | Base: isp_control</p>
+                    <p>Creado por Robertsystems</p>
                 </div>
             </div>
         </div>
@@ -600,12 +602,9 @@
                 
                 <div class="payment-detail">
                     <div>
-                        <strong>Cédula/RIF:</strong>
-                        <span id="pagoMovilCedula" style="font-weight: bold; color: var(--dark);">16318027</span>
+                        <strong>Banco:</strong>
+                        <span id="pagoMovilBanco" style="font-weight: bold; color: var(--dark);">0102 Venezuela</span>
                     </div>
-                    <button class="copy-btn" onclick="copyToClipboard('16318027', 'pagoMovilCedulaBtn')" id="pagoMovilCedulaBtn">
-                        <i class="fas fa-copy"></i> Copiar
-                    </button>
                 </div>
                 
                 <div class="payment-detail">
@@ -613,19 +612,13 @@
                         <strong>Teléfono:</strong>
                         <span id="pagoMovilTelefono" style="font-weight: bold; color: var(--dark);">04261308075</span>
                     </div>
-                    <button class="copy-btn" onclick="copyToClipboard('04261308075', 'pagoMovilTelefonoBtn')" id="pagoMovilTelefonoBtn">
-                        <i class="fas fa-copy"></i> Copiar
-                    </button>
                 </div>
                 
                 <div class="payment-detail">
                     <div>
-                        <strong>Banco:</strong>
-                        <span id="pagoMovilBanco" style="font-weight: bold; color: var(--dark);">0102 Venezuela</span>
+                        <strong>Cédula/RIF:</strong>
+                        <span id="pagoMovilCedula" style="font-weight: bold; color: var(--dark);">16318027</span>
                     </div>
-                    <button class="copy-btn" onclick="copyToClipboard('0102 Venezuela', 'pagoMovilBancoBtn')" id="pagoMovilBancoBtn">
-                        <i class="fas fa-copy"></i> Copiar
-                    </button>
                 </div>
                 
                 <div class="payment-detail">
@@ -633,15 +626,17 @@
                         <strong>Monto a pagar:</strong>
                         <span id="pagoMovilMonto" style="font-weight: bold; color: var(--danger); font-size: 18px;">0,00 Bs.</span>
                     </div>
-                    <button class="copy-btn" onclick="copyMonto()" id="pagoMovilMontoBtn">
-                        <i class="fas fa-copy"></i> Copiar
-                    </button>
                 </div>
+                
+                <!-- Botón para copiar todo -->
+                <button class="copy-all-btn" onclick="copyAllPagoMovil()" id="copyAllBtn">
+                    <i class="fas fa-copy"></i> Copiar Datos de Pago Móvil
+                </button>
                 
                 <div style="margin-top: 15px; padding: 15px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid var(--primary);">
                     <p style="font-size: 14px; color: var(--gray); margin: 0;">
                         <i class="fas fa-info-circle"></i> 
-                        Realiza el pago móvil con estos datos y luego completa el formulario con la referencia
+                        Al hacer clic se copiará: "0102 04261308075 16318027 MONTO" (sin decimales)
                     </p>
                 </div>
             </div>
@@ -767,6 +762,11 @@
             document.getElementById('referencia').value = '';
             document.getElementById('monto').value = '';
             removeFile();
+            
+            // Resetear texto del botón "Consultar"
+            const btn = document.getElementById('btnLogin');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-search"></i> Consultar';
         }
         
         function loadUserData() {
@@ -882,7 +882,9 @@
             if (currentUser && currentUser.deuda_total_bs !== undefined) {
                 const montoBs = currentUser.deuda_total_bs;
                 const montoElement = document.getElementById('pagoMovilMonto');
-                montoElement.textContent = formatCurrency(montoBs) + ' Bs.';
+                // Formatear el monto con separadores de miles
+                const montoFormateado = formatCurrency(montoBs);
+                montoElement.textContent = montoFormateado + ' Bs.';
                 
                 // También actualizar el campo de monto en el formulario
                 document.getElementById('monto').value = montoBs.toFixed(2);
@@ -936,6 +938,62 @@
             
             document.getElementById('paymentsTable').style.display = 'table';
             document.getElementById('noPayments').style.display = 'none';
+        }
+        
+        // ================= NUEVA FUNCIÓN: COPIAR DATOS DE PAGO MÓVIL =================
+        function copyAllPagoMovil() {
+            const telefono = document.getElementById('pagoMovilTelefono').textContent;
+            const cedula = document.getElementById('pagoMovilCedula').textContent;
+            const montoElement = document.getElementById('pagoMovilMonto').textContent;
+            
+            // Extraer solo los números del monto (incluyendo decimales)
+            const montoText = montoElement.replace(/[^0-9,.]/g, '');
+            let montoNumerico;
+            
+            // Determinar formato del número
+            if (montoText.includes(',') && montoText.includes('.')) {
+                // Formato: 1.234,56 (puntos para miles, coma para decimal)
+                montoNumerico = montoText.replace(/\./g, '').replace(',', '.');
+            } else if (montoText.includes(',')) {
+                // Si tiene coma, verificar si es decimal o miles
+                const lastCommaIndex = montoText.lastIndexOf(',');
+                const afterComma = montoText.substring(lastCommaIndex + 1);
+                
+                if (afterComma.length === 2) {
+                    // Probablemente decimales (ej: 1234,56)
+                    montoNumerico = montoText.replace(',', '.');
+                } else {
+                    // Probablemente miles (ej: 1,234)
+                    montoNumerico = montoText.replace(',', '');
+                }
+            } else {
+                // Solo números y puntos
+                montoNumerico = montoText;
+            }
+            
+            // Convertir a número y redondear a entero (sin decimales)
+            const montoEntero = Math.round(parseFloat(montoNumerico) || 0);
+            
+            // Formato: "0102 04261308075 16318027 MONTO" (sin decimales)
+            const textoCompleto = `0102 ${telefono} ${cedula} ${montoEntero}`;
+            
+            navigator.clipboard.writeText(textoCompleto).then(() => {
+                const button = document.getElementById('copyAllBtn');
+                const originalHTML = button.innerHTML;
+                
+                button.innerHTML = '<i class="fas fa-check"></i> ¡Copiado!';
+                button.classList.add('success');
+                
+                setTimeout(() => {
+                    button.innerHTML = originalHTML;
+                    button.classList.remove('success');
+                }, 2000);
+                
+                showMessage('paymentMessage', '✅ Todos los datos copiados en formato Pago Móvil', 'success');
+            }).catch(err => {
+                console.error('Error al copiar: ', err);
+                showMessage('paymentMessage', '❌ Error al copiar datos', 'error');
+            });
         }
         
         // ================= MODALES =================
@@ -1018,32 +1076,6 @@
             return (bytes / 1048576).toFixed(2) + ' MB';
         }
         
-        // ================= FUNCIONES DE COPIA =================
-        function copyToClipboard(text, buttonId) {
-            navigator.clipboard.writeText(text).then(() => {
-                const button = document.getElementById(buttonId);
-                const originalHTML = button.innerHTML;
-                
-                button.innerHTML = '<i class="fas fa-check"></i> Copiado';
-                button.classList.add('success');
-                
-                setTimeout(() => {
-                    button.innerHTML = originalHTML;
-                    button.classList.remove('success');
-                }, 2000);
-                
-                showMessage('paymentMessage', '✅ Texto copiado al portapapeles', 'success');
-            }).catch(err => {
-                console.error('Error al copiar: ', err);
-                showMessage('paymentMessage', '❌ Error al copiar al portapapeles', 'error');
-            });
-        }
-        
-        function copyMonto() {
-            const montoText = document.getElementById('pagoMovilMonto').textContent;
-            copyToClipboard(montoText, 'pagoMovilMontoBtn');
-        }
-        
         // ================= VALIDACIÓN DE PAGO =================
         function validatePayment() {
             const referencia = document.getElementById('referencia').value.trim();
@@ -1097,7 +1129,10 @@
         }
         
         function formatCurrency(amount) {
-            return parseFloat(amount).toLocaleString('es-VE', {
+            // Asegurarse de que amount sea un número
+            const numAmount = typeof amount === 'string' ? parseFloat(amount.replace(/,/g, '')) : parseFloat(amount);
+            
+            return numAmount.toLocaleString('es-VE', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
@@ -1112,9 +1147,7 @@
                 
                 if (data.h2?.connected) {
                     document.getElementById('statusIcon').style.color = '#10b981';
-                    document.getElementById('statusText').textContent = 'Conectado a H2';
-                    document.getElementById('dbInfo').innerHTML = 
-                        `Servidor: 54.232.39.174:9092 | Base: ${data.h2.database}`;
+                    document.getElementById('statusText').textContent = 'Conectado';
                     
                     // ACTUALIZAR TASA DE CAMBIO DESDE LA API
                     if (data.tasa_cambio) {
@@ -1124,7 +1157,7 @@
                     }
                 } else {
                     document.getElementById('statusIcon').style.color = '#f59e0b';
-                    document.getElementById('statusText').textContent = 'API disponible, H2 no conectado';
+                    document.getElementById('statusText').textContent = 'API disponible';
                 }
             } catch (error) {
                 console.error('Error en checkApiConnection:', error);
@@ -1145,7 +1178,7 @@
             
             const btn = document.getElementById('btnLogin');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando a H2...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
             
             try {
                 const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
@@ -1184,7 +1217,7 @@
                     }));
                     
                     // Mostrar dashboard
-                    showMessage('loginMessage', '✅ Conexión exitosa a H2 Database', 'success');
+                    showMessage('loginMessage', '✅ Conexión exitosa', 'success');
                     
                     setTimeout(() => {
                         showDashboard();
@@ -1202,21 +1235,21 @@
                         
                         // Actualizar estado de conexión
                         document.getElementById('statusIcon').style.color = '#10b981';
-                        document.getElementById('statusText').textContent = 'Conectado a H2';
+                        document.getElementById('statusText').textContent = 'Conectado';
                         
                     }, 1000);
                     
                 } else {
                     showMessage('loginMessage', data.message || 'Error en la autenticación', 'error');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-database"></i> Conectar a Base de Datos';
+                    btn.innerHTML = '<i class="fas fa-search"></i> Consultar';
                 }
                 
             } catch (error) {
                 console.error('Error en login:', error);
                 showMessage('loginMessage', '❌ Error de conexión con el servidor', 'error');
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-database"></i> Conectar a Base de Datos';
+                btn.innerHTML = '<i class="fas fa-search"></i> Consultar';
             }
         }
         
