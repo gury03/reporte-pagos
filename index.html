@@ -410,7 +410,7 @@
                     </div>
                     <div style="background: #dcfce7; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e;">
                         <div style="font-size: 14px; color: #166534;">Mensualidad</div>
-                        <div style="font-size: 18px; font-weight: 600; color: #15803d;" id="monthlyFee">0,00 Bs.</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #15803d;" id="monthlyFee">0,00</div>
                     </div>
                     <div style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
                         <div style="font-size: 14px; color: #92400e;">Estado</div>
@@ -531,9 +531,6 @@
             // URL de tu API en AWS (DIRECTA - sin proxy)
             apiUrl: 'https://holy-credit-b4ed.thecrow859.workers.dev/api',
             
-            // Si necesitas proxy por CORS, usa:
-            // apiUrl: 'https://tu-worker.tu-dominio.workers.dev/api',
-            
             useLocalFallback: false,
             
             // Telegram
@@ -542,28 +539,11 @@
                 chatId: "-5022910723"
             },
             
-            // Tasa de cambio
-            tasaCambio: 36.50,
-            
-            // Datos de respaldo (si la API falla)
-            abonadosLocal: [
-                {
-                    id: 1,
-                    codigo: '8765151',
-                    nombre: 'Aura Sierra',
-                    telefono: '0412-1234567',
-                    usuario_pppoe: 'aura8765151',
-                    estado: 'activo',
-                    plan_nombre: 'Plan 50 Mbps',
-                    plan_precio: 50.00,
-                    zona_nombre: 'Zona Centro',
-                    deudas: [{ mes: '01/2024', monto: 50.00, pagada: false }],
-                    pagos: [{ fecha: '2023-12-15', mes: '12/2023', monto: 50.00, referencia: 'TRF-001234', metodo: 'Transferencia' }]
-                }
-            ]
+            // Tasa de cambio - SE ACTUALIZARÁ DESDE LA API
+            tasaCambio: 36.50
         };
         
-        // ================= FUNCIONES DE INTERFAZ (definidas primero) =================
+        // ================= FUNCIONES DE INTERFAZ =================
         
         function showDashboard() {
             document.getElementById('loginSection').style.display = 'none';
@@ -597,9 +577,22 @@
             document.getElementById('userStatus').textContent = currentUser.estado || 'Desconocido';
             
             if (currentUser.plan_precio) {
-                document.getElementById('monthlyFee').textContent = 
-                    formatCurrency(currentUser.plan_precio) + ' Bs.';
+                // Mostrar mensualidad según moneda seleccionada
+                updateMonthlyFeeDisplay(currentUser.plan_precio);
             }
+        }
+        
+        function updateMonthlyFeeDisplay(precioBs) {
+            const monthlyFeeElement = document.getElementById('monthlyFee');
+            let displayAmount = precioBs;
+            let symbol = 'Bs.';
+            
+            if (currentCurrency === 'USD') {
+                displayAmount = precioBs / CONFIG.tasaCambio;
+                symbol = 'USD $';
+            }
+            
+            monthlyFeeElement.textContent = formatCurrency(displayAmount) + ' ' + symbol;
         }
         
         function switchCurrency(currency) {
@@ -615,35 +608,50 @@
             }
             
             // Recalcular deuda
-            if (currentUser && currentUser.deuda_total !== undefined) {
-                updateDebtDisplay(currentUser.deuda_total, '');
+            if (currentUser && currentUser.deuda_total_bs !== undefined) {
+                const meses = currentUser.deuda_meses || '';
+                updateDebtDisplay(currentUser.deuda_total_bs, meses);
+            }
+            
+            // Recalcular mensualidad
+            if (currentUser && currentUser.plan_precio) {
+                updateMonthlyFeeDisplay(currentUser.plan_precio);
             }
             
             // Recalcular pagos
-            loadPayments();
+            if (currentUser && currentUser.pagos_cache) {
+                updatePaymentsTable(currentUser.pagos_cache);
+            }
         }
         
-        function updateDebtDisplay(total, meses) {
+        function updateDebtDisplay(totalBs, meses) {
             const debtElement = document.getElementById('debtTotal');
             const monthsElement = document.getElementById('debtMonths');
+            const exchangeRateElement = document.getElementById('exchangeRate');
             
-            let displayAmount = total;
+            // Actualizar tasa en pantalla
+            exchangeRateElement.textContent = CONFIG.tasaCambio.toFixed(2);
+            
+            let displayAmount = totalBs;
             let currencySymbol = 'Bs.';
             
             if (currentCurrency === 'USD') {
-                displayAmount = total / CONFIG.tasaCambio;
+                // Convertir a dólares
+                displayAmount = totalBs / CONFIG.tasaCambio;
                 currencySymbol = 'USD $';
             }
             
             debtElement.textContent = formatCurrency(displayAmount) + ' ' + currencySymbol;
             
-            if (total === 0) {
+            if (totalBs === 0) {
                 debtElement.className = 'debt-total paid';
                 monthsElement.textContent = '¡Sin deudas pendientes!';
             } else {
                 debtElement.className = 'debt-total';
                 monthsElement.textContent = `Meses pendientes: ${meses || 'Consultando...'}`;
             }
+            
+            console.log(`💳 Deuda: ${totalBs} Bs. = ${(totalBs/CONFIG.tasaCambio).toFixed(2)} USD (Tasa: ${CONFIG.tasaCambio}) Moneda: ${currentCurrency}`);
         }
         
         function showNoPayments() {
@@ -661,17 +669,23 @@
                 const fecha = pago.fecha ? new Date(pago.fecha) : new Date();
                 const fechaFormateada = fecha.toLocaleDateString('es-VE');
                 
+                // Montos originales de la API
                 let montoBs = pago.monto_bs || pago.monto || 0;
                 let montoUsd = pago.monto_usd || (montoBs / CONFIG.tasaCambio);
                 
+                // Montos para mostrar según moneda seleccionada
+                let montoMostrar = montoBs;
+                let simboloMostrar = 'Bs.';
+                
                 if (currentCurrency === 'USD') {
-                    montoBs = montoUsd;
+                    montoMostrar = montoUsd;
+                    simboloMostrar = 'USD $';
                 }
                 
                 row.innerHTML = `
                     <td>${fechaFormateada}</td>
                     <td>${pago.mes || 'N/A'}</td>
-                    <td>${formatCurrency(montoBs)} ${currentCurrency === 'USD' ? 'USD $' : 'Bs.'}</td>
+                    <td>${formatCurrency(montoMostrar)} ${simboloMostrar}</td>
                     <td>${formatCurrency(montoUsd)} USD</td>
                     <td>${pago.referencia || 'N/A'}</td>
                     <td>${pago.metodo || 'Portal Web'}</td>
@@ -814,15 +828,17 @@
                     
                     // ACTUALIZAR TASA DE CAMBIO DESDE LA API
                     if (data.tasa_cambio) {
-                        CONFIG.tasaCambio = data.tasa_cambio;
+                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
+                        console.log(`💰 Tasa actualizada desde /health: ${CONFIG.tasaCambio}`);
                     }
                 } else {
                     document.getElementById('statusIcon').style.color = '#f59e0b';
                     document.getElementById('statusText').textContent = 'API disponible, H2 no conectado';
                 }
             } catch (error) {
+                console.error('Error en checkApiConnection:', error);
                 document.getElementById('statusIcon').style.color = '#f59e0b';
                 document.getElementById('statusText').textContent = 'Verificando conexión...';
             }
@@ -853,21 +869,30 @@
                 });
                 
                 const data = await response.json();
+                console.log('📊 Respuesta API login:', data);
                 
                 if (data.success) {
-                    // Guardar datos del usuario
-                    currentUser = data.abonado;
-                    
-                    // ACTUALIZAR TASA DE CAMBIO DESDE LA RESPUESTA
+                    // ACTUALIZAR TASA DE CAMBIO PRIMERO
                     if (data.tasa_cambio) {
-                        CONFIG.tasaCambio = data.tasa_cambio;
+                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
+                        console.log(`💰 Tasa actualizada en login: ${CONFIG.tasaCambio}`);
                     }
+                    
+                    // Guardar datos del usuario CON la tasa
+                    currentUser = {
+                        ...data.abonado,
+                        tasa_cambio: data.tasa_cambio,
+                        deuda_total_bs: data.abonado.deuda_total_bs || 0,
+                        deuda_meses: data.deudas ? data.deudas.map(d => d.mes).join(', ') : '',
+                        pagos_cache: data.pagos || []
+                    };
                     
                     localStorage.setItem('portal_abonado', JSON.stringify({
                         ...data.abonado,
-                        tasa_cambio: data.tasa_cambio
+                        tasa_cambio: data.tasa_cambio,
+                        deuda_total_bs: data.abonado.deuda_total_bs || 0
                     }));
                     
                     // Mostrar dashboard
@@ -877,11 +902,11 @@
                         showDashboard();
                         loadUserData();
                         
-                        // Usar deuda_total_bs en lugar de deuda_total
-                        updateDebtDisplay(
-                            data.abonado.deuda_total_bs || 0,
-                            data.deudas ? data.deudas.map(d => d.mes).join(', ') : ''
-                        );
+                        // Usar deuda_total_bs para mostrar
+                        const deudaBs = data.abonado.deuda_total_bs || 0;
+                        const meses = data.deudas ? data.deudas.map(d => d.mes).join(', ') : '';
+                        
+                        updateDebtDisplay(deudaBs, meses);
                         
                         if (data.pagos) {
                             updatePaymentsTable(data.pagos);
@@ -908,14 +933,31 @@
         }
         
         async function loadDebts() {
-            if (!currentUser) return;
+            if (!currentUser || !currentUser.usuario_pppoe) return;
             
             try {
-                const response = await fetch(`${CONFIG.apiUrl}/deudas/${currentUser.codigo}`);
+                const response = await fetch(`${CONFIG.apiUrl}/deudas/${currentUser.usuario_pppoe}`);
                 const data = await response.json();
                 
                 if (data.success) {
-                    updateDebtDisplay(data.deuda_total, data.meses_deuda);
+                    // Actualizar tasa si viene en la respuesta
+                    if (data.tasa_cambio) {
+                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
+                    
+                    // Actualizar usuario con nueva info
+                    currentUser.deuda_total_bs = data.deuda_total_bs || 0;
+                    currentUser.deuda_meses = data.meses_deuda || '';
+                    
+                    // Guardar en localStorage
+                    localStorage.setItem('portal_abonado', JSON.stringify({
+                        ...currentUser,
+                        tasa_cambio: CONFIG.tasaCambio
+                    }));
+                    
+                    updateDebtDisplay(data.deuda_total_bs, data.meses_deuda);
                 }
             } catch (error) {
                 console.error('Error cargando deudas:', error);
@@ -923,13 +965,23 @@
         }
         
         async function loadPayments() {
-            if (!currentUser) return;
+            if (!currentUser || !currentUser.usuario_pppoe) return;
             
             try {
-                const response = await fetch(`${CONFIG.apiUrl}/pagos/${currentUser.codigo}`);
+                const response = await fetch(`${CONFIG.apiUrl}/pagos/${currentUser.usuario_pppoe}`);
                 const data = await response.json();
                 
                 if (data.success && data.pagos && data.pagos.length > 0) {
+                    // Actualizar tasa si viene en la respuesta
+                    if (data.tasa_cambio) {
+                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
+                    
+                    // Guardar pagos en cache
+                    currentUser.pagos_cache = data.pagos;
+                    
                     updatePaymentsTable(data.pagos);
                 } else {
                     showNoPayments();
@@ -962,9 +1014,11 @@
                 document.getElementById('monto').value = '';
                 removeFile();
                 
-                // 4. Recargar datos (opcional)
-                loadDebts();
-                loadPayments();
+                // 4. Recargar datos
+                setTimeout(() => {
+                    loadDebts();
+                    loadPayments();
+                }, 2000);
                 
             } catch (error) {
                 console.error('Error enviando a Telegram:', error);
@@ -984,6 +1038,7 @@
                            `💰 *NUEVO PAGO REPORTADO*\n` +
                            `👤 *Abonado:* ${currentUser.nombre}\n` +
                            `🆔 *Código:* ${currentUser.codigo}\n` +
+                           `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
                            `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
                            `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
                            `📅 *Fecha pago:* ${fechaFormateada}\n` +
@@ -1019,7 +1074,7 @@
             const formData = new FormData();
             formData.append('chat_id', CONFIG.telegram.chatId);
             formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
-            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | Ref: ${pendingPayment.referencia}`);
+            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | PPPoE: ${currentUser.usuario_pppoe} | Ref: ${pendingPayment.referencia}`);
             formData.append('parse_mode', 'Markdown');
             
             const response = await fetch(url + method, {
@@ -1042,36 +1097,61 @@
             document.getElementById('mesPago').value = today.slice(0, 7);
             document.getElementById('mesPago').max = today.slice(0, 7);
             
-            // Mostrar tasa de cambio
+            // Mostrar tasa de cambio inicial
             document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
             
             // Configurar eventos
             document.getElementById('comprobante').addEventListener('change', handleFileUpload);
             
-            // Verificar conexión a la API
+            // Verificar conexión a la API (actualizará la tasa)
             checkApiConnection();
             
             // Verificar sesión guardada
             const savedUser = localStorage.getItem('portal_abonado');
             if (savedUser) {
                 try {
-                    currentUser = JSON.parse(savedUser);
+                    const userData = JSON.parse(savedUser);
+                    currentUser = userData;
+                    
+                    // Actualizar tasa si está guardada
+                    if (userData.tasa_cambio) {
+                        CONFIG.tasaCambio = parseFloat(userData.tasa_cambio);
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
+                    
                     showDashboard();
                     loadUserData();
+                    
+                    // Cargar deudas y pagos si hay datos
+                    if (userData.deuda_total_bs !== undefined) {
+                        updateDebtDisplay(userData.deuda_total_bs, userData.deuda_meses || '');
+                    }
+                    
                     loadDebts();
                     loadPayments();
                 } catch (e) {
+                    console.error('Error cargando sesión:', e);
                     localStorage.removeItem('portal_abonado');
                 }
             }
+            
+            // Debug: Verificar tasa cada 30 segundos
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`${CONFIG.apiUrl}/tasa-cambio`);
+                    const data = await response.json();
+                    if (data.success && data.tasa_cambio !== CONFIG.tasaCambio) {
+                        console.log(`🔄 Tasa actualizada en background: ${data.tasa_cambio}`);
+                        CONFIG.tasaCambio = data.tasa_cambio;
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
+                } catch (error) {
+                    // Silencioso
+                }
+            }, 30000);
         });
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
