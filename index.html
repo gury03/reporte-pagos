@@ -569,16 +569,41 @@
         function loadUserData() {
             if (!currentUser) return;
             
+            console.log('📊 Cargando datos del usuario:', currentUser); // Para debug
+            
+            // Actualizar información básica
             document.getElementById('userName').textContent = currentUser.nombre;
             document.getElementById('userCode').textContent = currentUser.codigo;
             document.getElementById('userPppoe').textContent = currentUser.usuario_pppoe || 'No asignado';
-            document.getElementById('userZone').textContent = currentUser.zona_nombre || 'Sin zona';
-            document.getElementById('userPlan').textContent = currentUser.plan_nombre || 'Sin plan';
-            document.getElementById('userStatus').textContent = currentUser.estado || 'Desconocido';
             
-            if (currentUser.plan_precio) {
-                // Mostrar mensualidad según moneda seleccionada
-                updateMonthlyFeeDisplay(currentUser.plan_precio);
+            // ZONA - CORREGIDO
+            const zonaNombre = currentUser.zona_nombre || 'Sin zona';
+            document.getElementById('userZone').textContent = zonaNombre;
+            console.log(`📍 Zona asignada: ${zonaNombre}`);
+            
+            // PLAN - CORREGIDO
+            const planNombre = currentUser.plan_nombre || 'Sin plan';
+            document.getElementById('userPlan').textContent = planNombre;
+            console.log(`💵 Plan asignado: ${planNombre}`);
+            
+            // ESTADO
+            const estado = currentUser.estado || 'Desconocido';
+            document.getElementById('userStatus').textContent = estado;
+            
+            // MENSUALIDAD - CORREGIDO
+            if (currentUser.plan_precio !== undefined && currentUser.plan_precio !== null) {
+                // plan_precio está en BOLÍVARES (ya convertido por la API)
+                const precioBs = parseFloat(currentUser.plan_precio);
+                updateMonthlyFeeDisplay(precioBs);
+                console.log(`💰 Mensualidad: ${precioBs} Bs.`);
+            } else if (currentUser.plan_precio_bs !== undefined && currentUser.plan_precio_bs !== null) {
+                // fallback a plan_precio_bs
+                const precioBs = parseFloat(currentUser.plan_precio_bs);
+                updateMonthlyFeeDisplay(precioBs);
+                console.log(`💰 Mensualidad (fallback): ${precioBs} Bs.`);
+            } else {
+                document.getElementById('monthlyFee').textContent = '0,00 Bs.';
+                console.log('⚠️  No se encontró precio de plan');
             }
         }
         
@@ -588,6 +613,7 @@
             let symbol = 'Bs.';
             
             if (currentCurrency === 'USD') {
+                // Convertir a dólares usando la tasa actual
                 displayAmount = precioBs / CONFIG.tasaCambio;
                 symbol = 'USD $';
             }
@@ -614,7 +640,7 @@
             }
             
             // Recalcular mensualidad
-            if (currentUser && currentUser.plan_precio) {
+            if (currentUser && currentUser.plan_precio !== undefined) {
                 updateMonthlyFeeDisplay(currentUser.plan_precio);
             }
             
@@ -636,7 +662,7 @@
             let currencySymbol = 'Bs.';
             
             if (currentCurrency === 'USD') {
-                // Convertir a dólares
+                // Convertir a dólares usando la tasa actual
                 displayAmount = totalBs / CONFIG.tasaCambio;
                 currencySymbol = 'USD $';
             }
@@ -662,6 +688,11 @@
         function updatePaymentsTable(pagos) {
             const tbody = document.getElementById('paymentsBody');
             tbody.innerHTML = '';
+            
+            if (!pagos || pagos.length === 0) {
+                showNoPayments();
+                return;
+            }
             
             pagos.forEach(pago => {
                 const row = document.createElement('tr');
