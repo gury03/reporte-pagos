@@ -657,10 +657,6 @@
                         <input type="date" id="fechaPago">
                     </div>
                     <div>
-                        <label>Mes que paga *</label>
-                        <input type="month" id="mesPago">
-                    </div>
-                    <div>
                         <label>Monto pagado (Bs.) *</label>
                         <input type="number" id="monto" placeholder="50.00" step="0.01">
                     </div>
@@ -687,7 +683,7 @@
                         <i class="fas fa-times"></i> Cancelar
                     </button>
                     <button onclick="validatePayment()" class="btn-success" id="btnSendPayment">
-                        <i class="fas fa-paper-plane"></i> Enviar Reporte
+                        <i class="fas fa-paper-plane"></i> Enviar
                     </button>
                 </div>
             </div>
@@ -708,13 +704,14 @@
                 <p><strong>Abonado:</strong> <span id="confirmName"></span></p>
                 <p><strong>Referencia:</strong> <span id="confirmRef"></span></p>
                 <p><strong>Fecha:</strong> <span id="confirmDate"></span></p>
-                <p><strong>Mes:</strong> <span id="confirmMonth"></span></p>
                 <p><strong>Monto:</strong> <span id="confirmAmount" style="color: var(--success); font-weight: bold;"></span></p>
             </div>
             
             <div class="action-buttons">
                 <button onclick="closeModal()" class="btn-secondary">Cancelar</button>
-                <button onclick="sendToTelegram()" class="btn-success">Enviar a Telegram</button>
+                <button onclick="sendToTelegram()" class="btn-success" id="btnConfirmTelegram">
+                    <i class="fas fa-paper-plane"></i> Enviar
+                </button>
             </div>
         </div>
     </div>
@@ -1005,8 +1002,6 @@
             // Configurar fecha actual
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('fechaPago').value = today;
-            document.getElementById('mesPago').value = today.slice(0, 7);
-            document.getElementById('mesPago').max = today.slice(0, 7);
             
             // Mostrar modal
             document.getElementById('paymentModal').style.display = 'flex';
@@ -1028,7 +1023,6 @@
             document.getElementById('confirmName').textContent = currentUser.nombre;
             document.getElementById('confirmRef').textContent = pendingPayment.referencia;
             document.getElementById('confirmDate').textContent = fechaFormateada;
-            document.getElementById('confirmMonth').textContent = pendingPayment.mes;
             document.getElementById('confirmAmount').textContent = formatCurrency(pendingPayment.monto) + ' Bs.';
             
             document.getElementById('confirmationModal').style.display = 'flex';
@@ -1081,7 +1075,6 @@
             const referencia = document.getElementById('referencia').value.trim();
             const fecha = document.getElementById('fechaPago').value;
             const monto = document.getElementById('monto').value;
-            const mes = document.getElementById('mesPago').value;
             
             if (!referencia || referencia.length < 6) {
                 showMessage('paymentMessage', 'La referencia debe tener al menos 6 caracteres', 'error');
@@ -1099,17 +1092,12 @@
                 return;
             }
             
-            if (!mes) {
-                showMessage('paymentMessage', 'Selecciona el mes que pagas', 'error');
-                return;
-            }
-            
             if (!uploadedFile) {
                 showMessage('paymentMessage', 'Debes subir el comprobante', 'error');
                 return;
             }
             
-            pendingPayment = { referencia, fecha, monto: montoNum, mes };
+            pendingPayment = { referencia, fecha, monto: montoNum };
             closePaymentModal();
             showConfirmationModal();
         }
@@ -1316,14 +1304,24 @@
         }
         
         async function sendToTelegram() {
-            if (!currentUser || !pendingPayment || !uploadedFile) return;
+            if (!currentUser || !pendingPayment || !uploadedFile) {
+                console.error('Faltan datos para enviar a Telegram');
+                showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
+                return;
+            }
             
-            const btn = document.getElementById('btnSendPayment');
+            const btn = document.getElementById('btnConfirmTelegram');
+            if (!btn) {
+                console.error('No se encontró el botón btnConfirmTelegram');
+                return;
+            }
+            
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-            closeModal();
             
             try {
+                console.log('📤 Iniciando envío a Telegram...');
+                
                 // 1. Enviar mensaje a Telegram
                 await sendTelegramMessage();
                 
@@ -1343,17 +1341,19 @@
                     loadPayments();
                 }, 2000);
                 
+                // 5. Cerrar modal
+                closeModal();
+                
             } catch (error) {
                 console.error('Error enviando a Telegram:', error);
                 showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
-            } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Reporte';
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
             }
         }
         
         async function sendTelegramMessage() {
-            const { referencia, fecha, monto, mes } = pendingPayment;
+            const { referencia, fecha, monto } = pendingPayment;
             const fechaFormateada = new Date(fecha).toLocaleDateString('es-VE');
             const hora = new Date().toLocaleTimeString('es-VE');
             
@@ -1365,13 +1365,14 @@
                            `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
                            `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
                            `📅 *Fecha pago:* ${fechaFormateada}\n` +
-                           `🗓️ *Mes pagado:* ${mes}\n` +
                            `🔢 *Referencia:* ${referencia}\n` +
                            `⏰ *Hora:* ${hora}\n` +
                            `📊 *Tasa cambio:* ${CONFIG.tasaCambio.toFixed(2)} Bs./USD\n` +
                            `━━━━━━━━━━━━━━━━━━━━\n`;
             
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`;
+            
+            console.log('📨 Enviando mensaje a Telegram...');
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -1388,9 +1389,15 @@
             if (!data.ok) {
                 throw new Error(data.description || 'Error de Telegram');
             }
+            
+            console.log('✅ Mensaje enviado a Telegram');
         }
         
         async function sendTelegramFile() {
+            if (!uploadedFile) {
+                throw new Error('No hay archivo para enviar');
+            }
+            
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
             const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
             
@@ -1399,6 +1406,8 @@
             formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
             formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | PPPoE: ${currentUser.usuario_pppoe} | Ref: ${pendingPayment.referencia}`);
             formData.append('parse_mode', 'Markdown');
+            
+            console.log('📎 Enviando archivo a Telegram...');
             
             const response = await fetch(url + method, {
                 method: 'POST',
@@ -1410,10 +1419,14 @@
             if (!data.ok) {
                 throw new Error(data.description || 'Error subiendo archivo');
             }
+            
+            console.log('✅ Archivo enviado a Telegram');
         }
         
         // ================= INICIALIZACIÓN =================
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Portal de Pagos ISP inicializado');
+            
             // Configurar eventos
             document.getElementById('comprobante').addEventListener('change', handleFileUpload);
             
