@@ -600,6 +600,14 @@
                     <i class="fas fa-mobile-alt"></i> Datos para Pago Móvil
                 </h3>
                 
+                <!-- Información de zona -->
+                <div style="margin-bottom: 15px; padding: 10px; background: #e0f2fe; border-radius: 6px; border-left: 4px solid #0ea5e9;">
+                    <p style="margin: 0; font-size: 14px; color: #0369a1;">
+                        <i class="fas fa-map-marker-alt"></i> 
+                        Zona actual: <span id="currentZone" style="font-weight: bold;"></span>
+                    </p>
+                </div>
+                
                 <div class="payment-detail">
                     <div>
                         <strong>Banco:</strong>
@@ -735,8 +743,55 @@
             },
             
             // Tasa de cambio - SE ACTUALIZARÁ DESDE LA API
-            tasaCambio: 36.50
+            tasaCambio: 36.50,
+            
+            // Configuración de pagos por zona
+            pagosPorZona: {
+                'los pozos': {
+                    banco: '0102 Venezuela',
+                    telefono: '04261308075',
+                    cedula: '16318027'
+                },
+                'la mesa': {
+                    banco: '0102 Venezuela',
+                    telefono: '04147625684',
+                    cedula: '18926859'
+                },
+                'las canoas': {
+                    banco: '0102 Venezuela',
+                    telefono: '04164034490',
+                    cedula: '17114655'
+                }
+            }
         };
+        
+        // ================= FUNCIONES AUXILIARES =================
+        
+        // Función para obtener datos de pago según la zona
+        function getPagoMovilData(zona) {
+            // Si no hay zona, usar "los pozos" como predeterminado
+            if (!zona) {
+                return CONFIG.pagosPorZona['los pozos'];
+            }
+            
+            // Convertir zona a minúsculas para comparación sin distinción de mayúsculas/minúsculas
+            const zonaLower = zona.toLowerCase().trim();
+            
+            // Buscar la zona exacta
+            if (CONFIG.pagosPorZona[zonaLower]) {
+                return CONFIG.pagosPorZona[zonaLower];
+            }
+            
+            // Buscar coincidencias parciales
+            for (const [key, value] of Object.entries(CONFIG.pagosPorZona)) {
+                if (zonaLower.includes(key)) {
+                    return value;
+                }
+            }
+            
+            // Si no hay coincidencia, usar "los pozos" como predeterminado
+            return CONFIG.pagosPorZona['los pozos'];
+        }
         
         // ================= FUNCIONES DE INTERFAZ =================
         
@@ -938,7 +993,7 @@
             document.getElementById('noPayments').style.display = 'none';
         }
         
-        // ================= NUEVA FUNCIÓN: COPIAR DATOS DE PAGO MÓVIL =================
+        // ================= FUNCIÓN: COPIAR DATOS DE PAGO MÓVIL =================
         function copyAllPagoMovil() {
             const telefono = document.getElementById('pagoMovilTelefono').textContent;
             const cedula = document.getElementById('pagoMovilCedula').textContent;
@@ -997,6 +1052,23 @@
         // ================= MODALES =================
         
         function showPaymentModal() {
+            if (!currentUser) {
+                showMessage('paymentMessage', '❌ No hay sesión de usuario activa', 'error');
+                return;
+            }
+            
+            // Obtener la zona del usuario
+            const userZone = currentUser.zona_nombre || 'Sin zona';
+            
+            // Obtener datos de pago según la zona
+            const pagoData = getPagoMovilData(userZone);
+            
+            // Actualizar los datos en el modal
+            document.getElementById('currentZone').textContent = userZone;
+            document.getElementById('pagoMovilBanco').textContent = pagoData.banco;
+            document.getElementById('pagoMovilTelefono').textContent = pagoData.telefono;
+            document.getElementById('pagoMovilCedula').textContent = pagoData.cedula;
+            
             // Actualizar monto en el modal
             updatePagoMovilMonto();
             
