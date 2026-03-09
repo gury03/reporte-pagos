@@ -730,7 +730,7 @@
         let currentCurrency = 'BS';
         let uploadedFile = null;
         let pendingPayment = null;
-        let refreshInterval = null; // [MEJORA] Para el refresco automático
+        let refreshInterval = null; // Para el refresco automático
         
         // ================= CONFIGURACIÓN =================
         const CONFIG = {
@@ -802,7 +802,7 @@
         }
         
         function logout() {
-            // [MEJORA] Detener refresco automático al salir
+            // Detener refresco automático al salir
             stopAutoRefresh();
             
             currentUser = null;
@@ -826,19 +826,34 @@
             btn.innerHTML = '<i class="fas fa-search"></i> Consultar';
         }
         
+        // ================= FUNCIÓN MEJORADA: loadUserData =================
         function loadUserData() {
             if (!currentUser) return;
             
             console.log('📊 Cargando datos del usuario:', currentUser);
             
             // Actualizar información básica
-            document.getElementById('userName').textContent = currentUser.nombre;
-            document.getElementById('userCode').textContent = currentUser.codigo;
+            document.getElementById('userName').textContent = currentUser.nombre || 'N/D';
+            document.getElementById('userCode').textContent = currentUser.codigo || 'N/D';
             document.getElementById('userPppoe').textContent = currentUser.usuario_pppoe || 'No asignado';
             
-            // ZONA
-            const zonaNombre = currentUser.zona_nombre || 'Sin zona';
+            // --- MEJORA: ZONA (Robusta ante cambios) ---
+            // Buscar la zona en diferentes propiedades posibles
+            let zonaNombre = 'Sin zona';
+            if (currentUser.zona_nombre) {
+                zonaNombre = currentUser.zona_nombre;
+                console.log('📍 Zona encontrada en zona_nombre:', zonaNombre);
+            } else if (currentUser.zona) {
+                zonaNombre = currentUser.zona;
+                console.log('📍 Zona encontrada en zona:', zonaNombre);
+            } else if (currentUser.zona_id) {
+                zonaNombre = `ID: ${currentUser.zona_id}`;
+                console.log('📍 Solo ID de zona encontrado:', currentUser.zona_id);
+            } else {
+                console.log('📍 No se encontró información de zona');
+            }
             document.getElementById('userZone').textContent = zonaNombre;
+            // -------------------------------------------
             
             // PLAN
             const planNombre = currentUser.plan_nombre || 'Sin plan';
@@ -1061,8 +1076,8 @@
                 return;
             }
             
-            // Obtener la zona del usuario
-            const userZone = currentUser.zona_nombre || 'Sin zona';
+            // Obtener la zona del usuario (usando la función mejorada)
+            const userZone = currentUser.zona_nombre || currentUser.zona || 'Sin zona';
             
             // Obtener datos de pago según la zona
             const pagoData = getPagoMovilData(userZone);
@@ -1239,7 +1254,7 @@
             });
         }
         
-        // ================= [MEJORA] FUNCIÓN PARA REFRESCAR DATOS DEL USUARIO =================
+        // ================= FUNCIÓN PARA REFRESCAR DATOS DEL USUARIO =================
         async function refreshUserData() {
             if (!currentUser || !currentUser.usuario_pppoe) {
                 console.log('No hay usuario logueado para refrescar');
@@ -1316,7 +1331,7 @@
             }
         }
 
-        // ================= [MEJORA] FUNCIONES PARA REFRESCO AUTOMÁTICO =================
+        // ================= FUNCIONES PARA REFRESCO AUTOMÁTICO =================
         function startAutoRefresh() {
             // Limpiar intervalo existente si lo hay
             if (refreshInterval) {
@@ -1399,7 +1414,7 @@
                 // 5. Recargar datos
                 setTimeout(() => {
                     if (currentUser) {
-                        refreshUserData(); // [MEJORA] Usamos la nueva función
+                        refreshUserData(); // Usamos la nueva función
                     }
                 }, 1500);
                 
@@ -1596,7 +1611,7 @@
                         document.getElementById('statusIcon').style.color = '#10b981';
                         document.getElementById('statusText').textContent = 'Conectado';
                         
-                        // [MEJORA] Programar refresco automático cada 60 segundos
+                        // Programar refresco automático cada 60 segundos
                         startAutoRefresh();
                         
                     }, 1000);
@@ -1615,7 +1630,7 @@
             }
         }
         
-        // [MEJORA] Función loadDebts simplificada
+        // Función loadDebts simplificada
         async function loadDebts() {
             const success = await refreshUserData();
             if (success) {
@@ -1625,7 +1640,7 @@
             }
         }
         
-        // [MEJORA] Función loadPayments simplificada
+        // Función loadPayments simplificada
         async function loadPayments() {
             const success = await refreshUserData();
             if (!success) {
@@ -1648,7 +1663,7 @@
             if (savedUser) {
                 try {
                     const userData = JSON.parse(savedUser);
-                    // [MEJORA] Asignación temporal para que refreshUserData funcione
+                    // Asignación temporal para que refreshUserData funcione
                     currentUser = userData;
                     
                     // Actualizar tasa si está guardada (será sobreescrita por refresh)
@@ -1684,7 +1699,7 @@
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
                         
-                        // [MEJORA] Si cambia la tasa, actualizar todos los montos en pantalla
+                        // Si cambia la tasa, actualizar todos los montos en pantalla
                         if (currentUser) {
                             refreshUserData();
                         }
