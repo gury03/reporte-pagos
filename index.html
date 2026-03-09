@@ -466,7 +466,7 @@
                 
                 <div class="form-group">
                     <label>Cédula / Código *</label>
-                    <input type="text" id="codigo" placeholder="Ej: 8765151">
+                    <input type="text" id="codigo" placeholder="Ej: 12345678">
                 </div>
                 
                 <div class="form-group">
@@ -498,6 +498,9 @@
                 <button onclick="logout()" style="width: auto; padding: 10px 20px;">
                     <i class="fas fa-sign-out-alt"></i> Salir
                 </button>
+                <button onclick="diagnosticarZona()" style="width: auto; padding: 10px 20px; background: #f59e0b; margin-left: 10px;">
+    <i class="fas fa-bug"></i> Diagnóstico
+</button>
             </div>
 
             <!-- Debt Summary -->
@@ -543,8 +546,8 @@
                     <button onclick="showPaymentModal()" class="btn-primary">
                         <i class="fas fa-credit-card"></i> Registrar Pago
                     </button>
-                    <button onclick="loadDebts()" class="btn-secondary">
-                        <i class="fas fa-sync-alt"></i> Actualizar Deuda
+                    <button onclick="refreshUserData()" class="btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Actualizar Datos
                     </button>
                 </div>
             </div>
@@ -730,7 +733,7 @@
         let currentCurrency = 'BS';
         let uploadedFile = null;
         let pendingPayment = null;
-        let refreshInterval = null; // Para el refresco automático
+        let refreshInterval = null;
         
         // ================= CONFIGURACIÓN =================
         const CONFIG = {
@@ -829,14 +832,14 @@
         // ================= FUNCIÓN MEJORADA: loadUserData =================
         function loadUserData() {
             if (!currentUser) return;
-            
+
             console.log('📊 Cargando datos del usuario:', currentUser);
-            
+
             // Actualizar información básica
             document.getElementById('userName').textContent = currentUser.nombre || 'N/D';
             document.getElementById('userCode').textContent = currentUser.codigo || 'N/D';
             document.getElementById('userPppoe').textContent = currentUser.usuario_pppoe || 'No asignado';
-            
+
             // --- MEJORA: ZONA (Robusta ante cambios) ---
             // Buscar la zona en diferentes propiedades posibles
             let zonaNombre = 'Sin zona';
@@ -854,30 +857,61 @@
             }
             document.getElementById('userZone').textContent = zonaNombre;
             // -------------------------------------------
-            
-            // PLAN
-            const planNombre = currentUser.plan_nombre || 'Sin plan';
+
+            // PLAN (también robusto)
+            const planNombre = currentUser.plan_nombre || currentUser.plan || 'Sin plan';
             document.getElementById('userPlan').textContent = planNombre;
-            
+
             // ESTADO
             const estado = currentUser.estado || 'Desconocido';
             document.getElementById('userStatus').textContent = estado;
+
+            // MENSUALIDAD (robusta)
+            let precioBs = 0;
+            if (currentUser.plan_precio_bs !== undefined && currentUser.plan_precio_bs !== null) {
+                precioBs = parseFloat(currentUser.plan_precio_bs);
+                console.log('💰 Precio encontrado en plan_precio_bs:', precioBs);
+            } else if (currentUser.plan_precio !== undefined && currentUser.plan_precio !== null) {
+                precioBs = parseFloat(currentUser.plan_precio);
+                console.log('💰 Precio encontrado en plan_precio:', precioBs);
+            } else if (currentUser.plan_precio_usd !== undefined && currentUser.plan_precio_usd !== null) {
+                precioBs = parseFloat(currentUser.plan_precio_usd) * CONFIG.tasaCambio;
+                console.log('💰 Precio calculado desde USD:', precioBs);
+            }
             
-            // MENSUALIDAD
-            if (currentUser.plan_precio !== undefined && currentUser.plan_precio !== null) {
-                const precioBs = parseFloat(currentUser.plan_precio);
-                updateMonthlyFeeDisplay(precioBs);
-            } else if (currentUser.plan_precio_bs !== undefined && currentUser.plan_precio_bs !== null) {
-                const precioBs = parseFloat(currentUser.plan_precio_bs);
+            if (precioBs > 0) {
                 updateMonthlyFeeDisplay(precioBs);
             } else {
                 document.getElementById('monthlyFee').textContent = '0,00 Bs.';
             }
-            
+
             // Actualizar monto para pago móvil
             updatePagoMovilMonto();
         }
         
+// ================= FUNCIÓN TEMPORAL DE DIAGNÓSTICO =================
+function diagnosticarZona() {
+    if (!currentUser) {
+        console.log('❌ No hay currentUser');
+        return;
+    }
+    
+    console.log('🔍 DIAGNÓSTICO DE ZONA:');
+    console.log('1. currentUser completo:', JSON.stringify(currentUser, null, 2));
+    console.log('2. Propiedades disponibles:', Object.keys(currentUser));
+    console.log('3. zona_nombre:', currentUser.zona_nombre);
+    console.log('4. zona:', currentUser.zona);
+    console.log('5. zona_id:', currentUser.zona_id);
+    
+    // Mostrar alerta con la info
+    alert(`DIAGNÓSTICO:\n
+    zona_nombre: ${currentUser.zona_nombre || 'NO EXISTE'}\n
+    zona: ${currentUser.zona || 'NO EXISTE'}\n
+    zona_id: ${currentUser.zona_id || 'NO EXISTE'}\n
+    plan: ${currentUser.plan_nombre || 'NO EXISTE'}\n
+    estado: ${currentUser.estado || 'NO EXISTE'}`);
+}
+
         function updateMonthlyFeeDisplay(precioBs) {
             const monthlyFeeElement = document.getElementById('monthlyFee');
             let displayAmount = precioBs;
@@ -910,8 +944,20 @@
             }
             
             // Recalcular mensualidad
-            if (currentUser && currentUser.plan_precio !== undefined) {
-                updateMonthlyFeeDisplay(currentUser.plan_precio);
+            if (currentUser) {
+                // Buscar el precio de la mensualidad donde sea que esté
+                let precioBs = 0;
+                if (currentUser.plan_precio_bs) {
+                    precioBs = parseFloat(currentUser.plan_precio_bs);
+                } else if (currentUser.plan_precio) {
+                    precioBs = parseFloat(currentUser.plan_precio);
+                } else if (currentUser.plan_precio_usd) {
+                    precioBs = parseFloat(currentUser.plan_precio_usd) * CONFIG.tasaCambio;
+                }
+                
+                if (precioBs > 0) {
+                    updateMonthlyFeeDisplay(precioBs);
+                }
             }
             
             // Recalcular pagos
@@ -954,7 +1000,6 @@
             if (currentUser && currentUser.deuda_total_bs !== undefined) {
                 const montoBs = currentUser.deuda_total_bs;
                 const montoElement = document.getElementById('pagoMovilMonto');
-                // Formatear el monto con separadores de miles
                 const montoFormateado = formatCurrency(montoBs);
                 montoElement.textContent = montoFormateado + ' Bs.';
                 
@@ -1076,7 +1121,7 @@
                 return;
             }
             
-            // Obtener la zona del usuario (usando la función mejorada)
+            // Obtener la zona del usuario (robusto)
             const userZone = currentUser.zona_nombre || currentUser.zona || 'Sin zona';
             
             // Obtener datos de pago según la zona
@@ -1254,7 +1299,7 @@
             });
         }
         
-        // ================= FUNCIÓN PARA REFRESCAR DATOS DEL USUARIO =================
+        // ================= [MEJORA] FUNCIÓN PARA REFRESCAR DATOS DEL USUARIO =================
         async function refreshUserData() {
             if (!currentUser || !currentUser.usuario_pppoe) {
                 console.log('No hay usuario logueado para refrescar');
@@ -1263,8 +1308,13 @@
 
             console.log('🔄 Refrescando datos para:', currentUser.usuario_pppoe);
             
+            // Mostrar indicador de carga
+            const debtMsg = document.getElementById('debtMessage');
+            debtMsg.style.display = 'block';
+            debtMsg.className = 'message';
+            debtMsg.textContent = 'Actualizando datos...';
+            
             try {
-                // Llamar al mismo endpoint que el login, que ya trae todo: abonado, deudas, pagos y tasa
                 const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
                     method: 'POST',
                     headers: { 
@@ -1272,7 +1322,7 @@
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({ 
-                        nombre: currentUser.nombre, // Usamos datos guardados como referencia
+                        nombre: currentUser.nombre,
                         codigo: currentUser.usuario_pppoe, 
                         telefono: currentUser.telefono 
                     })
@@ -1289,7 +1339,7 @@
                             CONFIG.tasaCambio.toFixed(2);
                     }
                     
-                    // Actualizar currentUser con los nuevos datos, preservando la estructura
+                    // Crear el objeto currentUser actualizado
                     currentUser = {
                         ...data.abonado,
                         tasa_cambio: data.tasa_cambio,
@@ -1297,16 +1347,12 @@
                         deuda_meses: data.deudas ? data.deudas.map(d => d.mes).join(', ') : '',
                         pagos_cache: data.pagos || []
                     };
-                    
-                    // Actualizar localStorage
-                    localStorage.setItem('portal_abonado', JSON.stringify({
-                        ...data.abonado,
-                        tasa_cambio: data.tasa_cambio,
-                        deuda_total_bs: data.abonado.deuda_total_bs || 0
-                    }));
+
+                    // Guardar en localStorage
+                    localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
 
                     // Actualizar TODA la interfaz
-                    loadUserData(); // Esto actualiza nombre, plan, zona, etc.
+                    loadUserData();
                     
                     // Usar deuda_total_bs para mostrar
                     const deudaBs = data.abonado.deuda_total_bs || 0;
@@ -1318,20 +1364,38 @@
                     }
 
                     console.log('✅ Datos refrescados correctamente');
+                    
+                    // Mostrar mensaje de éxito
+                    debtMsg.textContent = '✅ Datos actualizados correctamente';
+                    debtMsg.className = 'message success';
+                    setTimeout(() => {
+                        debtMsg.style.display = 'none';
+                    }, 3000);
+                    
                     return true;
                     
                 } else {
                     console.error('❌ Error al refrescar datos:', data.message);
+                    debtMsg.textContent = '❌ Error al actualizar datos';
+                    debtMsg.className = 'message error';
+                    setTimeout(() => {
+                        debtMsg.style.display = 'none';
+                    }, 3000);
                     return false;
                 }
                 
             } catch (error) {
                 console.error('❌ Error en refreshUserData:', error);
+                debtMsg.textContent = '❌ Error de conexión al actualizar';
+                debtMsg.className = 'message error';
+                setTimeout(() => {
+                    debtMsg.style.display = 'none';
+                }, 3000);
                 return false;
             }
         }
 
-        // ================= FUNCIONES PARA REFRESCO AUTOMÁTICO =================
+        // ================= [MEJORA] FUNCIONES PARA REFRESCO AUTOMÁTICO =================
         function startAutoRefresh() {
             // Limpiar intervalo existente si lo hay
             if (refreshInterval) {
@@ -1347,7 +1411,7 @@
                     // Si no hay usuario, detener el intervalo
                     stopAutoRefresh();
                 }
-            }, 60000); // Ajusta este valor a tu gusto (30s = 30000, 60s = 60000)
+            }, 60000);
         }
 
         function stopAutoRefresh() {
@@ -1358,7 +1422,7 @@
             }
         }
         
-        // ================= ENVÍO A TELEGRAM CORREGIDO =================
+        // ================= ENVÍO A TELEGRAM =================
         async function sendToTelegram() {
             console.log('🔍 Verificando datos para Telegram:', {
                 currentUser: !!currentUser,
@@ -1414,7 +1478,7 @@
                 // 5. Recargar datos
                 setTimeout(() => {
                     if (currentUser) {
-                        refreshUserData(); // Usamos la nueva función
+                        refreshUserData();
                     }
                 }, 1500);
                 
@@ -1584,11 +1648,8 @@
                         pagos_cache: data.pagos || []
                     };
                     
-                    localStorage.setItem('portal_abonado', JSON.stringify({
-                        ...data.abonado,
-                        tasa_cambio: data.tasa_cambio,
-                        deuda_total_bs: data.abonado.deuda_total_bs || 0
-                    }));
+                    // Guardar en localStorage
+                    localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
                     
                     // Mostrar dashboard
                     showMessage('loginMessage', '✅ Conexión exitosa', 'success');
@@ -1630,24 +1691,6 @@
             }
         }
         
-        // Función loadDebts simplificada
-        async function loadDebts() {
-            const success = await refreshUserData();
-            if (success) {
-                showMessage('debtMessage', '✅ Deuda actualizada correctamente', 'success');
-            } else {
-                showMessage('debtMessage', '❌ Error al actualizar la deuda', 'error');
-            }
-        }
-        
-        // Función loadPayments simplificada
-        async function loadPayments() {
-            const success = await refreshUserData();
-            if (!success) {
-                console.log('No se pudieron cargar los pagos.');
-            }
-        }
-        
         // ================= INICIALIZACIÓN =================
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Portal de Pagos ISP inicializado');
@@ -1663,21 +1706,28 @@
             if (savedUser) {
                 try {
                     const userData = JSON.parse(savedUser);
-                    // Asignación temporal para que refreshUserData funcione
                     currentUser = userData;
                     
-                    // Actualizar tasa si está guardada (será sobreescrita por refresh)
+                    // Actualizar tasa si está guardada
                     if (userData.tasa_cambio) {
                         CONFIG.tasaCambio = parseFloat(userData.tasa_cambio);
                         document.getElementById('exchangeRate').textContent = 
                             CONFIG.tasaCambio.toFixed(2);
                     }
                     
-                    // Mostrar dashboard inmediatamente
                     showDashboard();
                     loadUserData();
                     
-                    // Luego refrescar datos en segundo plano
+                    // Mostrar deuda y pagos si existen
+                    if (userData.deuda_total_bs !== undefined) {
+                        updateDebtDisplay(userData.deuda_total_bs, userData.deuda_meses || '');
+                    }
+                    
+                    if (userData.pagos_cache) {
+                        updatePaymentsTable(userData.pagos_cache);
+                    }
+                    
+                    // Refrescar datos en segundo plano
                     refreshUserData().then(() => {
                         // Iniciar refresco automático después del primer refresco exitoso
                         startAutoRefresh();
@@ -1701,7 +1751,13 @@
                         
                         // Si cambia la tasa, actualizar todos los montos en pantalla
                         if (currentUser) {
-                            refreshUserData();
+                            loadUserData();
+                            if (currentUser.deuda_total_bs !== undefined) {
+                                updateDebtDisplay(currentUser.deuda_total_bs, currentUser.deuda_meses || '');
+                            }
+                            if (currentUser.pagos_cache) {
+                                updatePaymentsTable(currentUser.pagos_cache);
+                            }
                         }
                     }
                 } catch (error) {
