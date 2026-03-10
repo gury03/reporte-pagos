@@ -989,16 +989,25 @@
         
         // ================= CONFIGURACIÓN =================
         const CONFIG = {
+            // URL de tu API - usando la misma que funcionaba antes
             apiUrl: 'https://holy-credit-b4ed.thecrow859.workers.dev/api',
+            
+            // Telegram
             telegram: {
                 botToken: "8205932700:AAF8h_nghnRr4VC74FAS_ZPMrKi60gL-2_I",
                 chatId: "-5022910723"
             },
+            
+            // Tasa de cambio - SE ACTUALIZARÁ DESDE LA API
             tasaCambio: 36.50,
+            
+            // Credenciales de técnico
             techCredentials: {
                 user: 'thecrow859',
                 password: 'Jrl16318027'
             },
+            
+            // Configuración de pagos por zona
             pagosPorZona: {
                 'los pozos': {
                     banco: '0102 Venezuela',
@@ -1069,8 +1078,10 @@
             // Verificar tasa cada 30 segundos
             setInterval(async () => {
                 try {
-                    const response = await fetch(getApiUrl('/tasa-cambio'), {
-                        headers: getHeaders()
+                    const response = await fetch(`${CONFIG.apiUrl}/tasa-cambio`, {
+                        headers: {
+                            'X-Database': selectedDatabase
+                        }
                     });
                     const data = await response.json();
                     if (data.success && data.tasa_cambio !== CONFIG.tasaCambio) {
@@ -1088,21 +1099,6 @@
             }, 30000);
         });
 
-        // ================= FUNCIONES PARA HEADERS Y URLS =================
-        function getHeaders(additionalHeaders = {}) {
-            const headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Database': selectedDatabase,
-                ...additionalHeaders
-            };
-            return headers;
-        }
-
-        function getApiUrl(endpoint) {
-            return `${CONFIG.apiUrl}${endpoint}`;
-        }
-
         // ================= FUNCIONES DE BASE DE DATOS =================
         async function loadDatabases() {
             const dbLoading = document.getElementById('databaseLoading');
@@ -1112,8 +1108,11 @@
             dbList.innerHTML = '';
             
             try {
-                const response = await fetch(getApiUrl('/databases'), {
-                    headers: getHeaders()
+                // Usando el método directo que funcionaba antes
+                const response = await fetch(`${CONFIG.apiUrl}/databases`, {
+                    headers: {
+                        'X-Database': selectedDatabase
+                    }
                 });
                 const data = await response.json();
                 
@@ -1277,7 +1276,7 @@
             document.getElementById('userCode').textContent = currentUser.codigo || 'N/D';
             document.getElementById('userPppoe').textContent = currentUser.usuario_pppoe || 'No asignado';
             
-            // ZONA
+            // ZONA - Versión mejorada
             let zonaNombre = 'Sin zona';
             if (currentUser.zona_nombre) {
                 zonaNombre = currentUser.zona_nombre;
@@ -1648,23 +1647,28 @@
             });
         }
         
-        // ================= FUNCIÓN PARA REFRESCAR DATOS =================
+        // ================= FUNCIÓN PARA REFRESCAR DATOS DEL USUARIO =================
         async function refreshUserData() {
             if (!currentUser || !currentUser.usuario_pppoe) {
                 return false;
             }
 
             try {
-                const response = await fetch(getApiUrl('/verify-abonado'), {
+                // Usando el método directo que funcionaba antes
+                const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
                     method: 'POST',
-                    headers: getHeaders(),
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Database': selectedDatabase
+                    },
                     body: JSON.stringify({ 
                         nombre: currentUser.nombre,
                         codigo: currentUser.usuario_pppoe, 
                         telefono: currentUser.telefono 
                     })
                 });
-                
+
                 const data = await response.json();
 
                 if (data.success) {
@@ -1826,8 +1830,11 @@
         // ================= FUNCIONES ASINCRONAS =================
         async function checkApiConnection() {
             try {
-                const response = await fetch(getApiUrl('/health'), {
-                    headers: getHeaders()
+                // Usando el método directo que funcionaba antes
+                const response = await fetch(`${CONFIG.apiUrl}/health`, {
+                    headers: {
+                        'X-Database': selectedDatabase
+                    }
                 });
                 const data = await response.json();
                 
@@ -1866,9 +1873,14 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
             
             try {
-                const response = await fetch(getApiUrl('/verify-abonado'), {
+                // Usando el método directo que funcionaba antes
+                const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
                     method: 'POST',
-                    headers: getHeaders(),
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Database': selectedDatabase
+                    },
                     body: JSON.stringify({ nombre, codigo, telefono })
                 });
                 
