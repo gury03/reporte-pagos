@@ -978,38 +978,7 @@
     </div>
 
     <script>
-        // ================= CONFIGURACIÓN - DEFINIDA PRIMERO =================
-        const CONFIG = {
-            apiUrl: 'https://holy-credit-b4ed.thecrow859.workers.dev/api',
-            telegram: {
-                botToken: "8205932700:AAF8h_nghnRr4VC74FAS_ZPMrKi60gL-2_I",
-                chatId: "-5022910723"
-            },
-            tasaCambio: 36.50,
-            techCredentials: {
-                user: 'thecrow859',
-                password: 'Jrl16318027'
-            },
-            pagosPorZona: {
-                'los pozos': {
-                    banco: '0102 Venezuela',
-                    telefono: '04261308075',
-                    cedula: '16318027'
-                },
-                'la mesa': {
-                    banco: '0102 Venezuela',
-                    telefono: '04147625684',
-                    cedula: '18926859'
-                },
-                'las canoas': {
-                    banco: '0102 Venezuela',
-                    telefono: '04164034490',
-                    cedula: '17114655'
-                }
-            }
-        };
-
-        // ================= VARIABLES GLOBALES =================
+        // ================= DECLARACIÓN DE VARIABLES GLOBALES =================
         let currentUser = null;
         let currentCurrency = 'BS';
         let uploadedFile = null;
@@ -1017,6 +986,133 @@
         let refreshInterval = null;
         let isTechLoggedIn = false;
         let selectedDatabase = localStorage.getItem('selectedDatabase') || 'isp_control';
+        
+        // ================= CONFIGURACIÓN =================
+                  const CONFIG = (function() {
+              // Objeto sellado que no puede ser modificado
+              const config = {
+                  apiUrl: 'https://holy-credit-b4ed.thecrow859.workers.dev/api',
+                  telegram: {
+                      botToken: "8205932700:AAF8h_nghnRr4VC74FAS_ZPMrKi60gL-2_I",
+                      chatId: "-5022910723"
+                  },
+                  tasaCambio: 36.50,
+                  techCredentials: {
+                      user: 'thecrow859',
+                      password: 'Jrl16318027'
+                  },
+                  pagosPorZona: {
+                      'los pozos': {
+                          banco: '0102 Venezuela',
+                          telefono: '04261308075',
+                          cedula: '16318027'
+                      },
+                      'la mesa': {
+                          banco: '0102 Venezuela',
+                          telefono: '04147625684',
+                          cedula: '18926859'
+                      },
+                      'las canoas': {
+                          banco: '0102 Venezuela',
+                          telefono: '04164034490',
+                          cedula: '17114655'
+                      }
+                  }
+              };
+              
+              // Congelar el objeto para que NADIE pueda modificarlo
+              Object.freeze(config);
+              Object.freeze(config.telegram);
+              Object.freeze(config.techCredentials);
+              Object.freeze(config.pagosPorZona);
+              Object.freeze(config.pagosPorZona['los pozos']);
+              Object.freeze(config.pagosPorZona['la mesa']);
+              Object.freeze(config.pagosPorZona['las canoas']);
+              
+              console.log('✅ CONFIG creada y congelada en:', new Date().toISOString());
+              console.log('✅ API URL:', config.apiUrl);
+              
+              return config;
+          })();
+
+          // Verificación inmediata
+          console.log('🔍 Verificación post-configuración:', {
+              apiUrl: CONFIG.apiUrl,
+              type: typeof CONFIG.apiUrl,
+              length: CONFIG.apiUrl ? CONFIG.apiUrl.length : 0
+          });
+
+        // ================= FUNCIONES DE INICIALIZACIÓN =================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Portal de Pagos ISP inicializado');
+            console.log('📀 Base de datos seleccionada:', selectedDatabase);
+            
+            // Configurar eventos
+            document.getElementById('comprobante').addEventListener('change', handleFileUpload);
+            
+            // Actualizar UI con la BD seleccionada
+            updateDatabaseInfo();
+            
+            // Verificar conexión a la API
+            checkApiConnection();
+            
+            // Verificar sesión guardada
+            const savedUser = localStorage.getItem('portal_abonado');
+            if (savedUser) {
+                try {
+                    const userData = JSON.parse(savedUser);
+                    currentUser = userData;
+                    
+                    if (userData.tasa_cambio) {
+                        CONFIG.tasaCambio = parseFloat(userData.tasa_cambio);
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                    }
+                    
+                    showDashboard();
+                    loadUserData();
+                    
+                    if (userData.deuda_total_bs !== undefined) {
+                        updateDebtDisplay(userData.deuda_total_bs, userData.deuda_meses || '');
+                    }
+                    
+                    if (userData.pagos_cache) {
+                        updatePaymentsTable(userData.pagos_cache);
+                    }
+                    
+                    refreshUserData().then(() => {
+                        startAutoRefresh();
+                    });
+                    
+                } catch (e) {
+                    console.error('Error cargando sesión:', e);
+                    localStorage.removeItem('portal_abonado');
+                }
+            }
+            
+            // Verificar tasa cada 30 segundos
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`${CONFIG.apiUrl}/tasa-cambio`, {
+                        headers: {
+                            'X-Database': selectedDatabase  // ← AÑADE ESTO
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.success && data.tasa_cambio !== CONFIG.tasaCambio) {
+                        CONFIG.tasaCambio = data.tasa_cambio;
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
+                        
+                        if (currentUser) {
+                            refreshUserData();
+                        }
+                    }
+                } catch (error) {
+                    // Silencioso
+                }
+            }, 30000);
+        });
 
         // ================= FUNCIONES DE BASE DE DATOS =================
         async function loadDatabases() {
@@ -1027,9 +1123,10 @@
             dbList.innerHTML = '';
             
             try {
+                // Asegúrate de que esta llamada incluya el header
                 const response = await fetch(`${CONFIG.apiUrl}/databases`, {
                     headers: {
-                        'X-Database': selectedDatabase
+                        'X-Database': selectedDatabase  // ← ESTO ES CRUCIAL
                     }
                 });
                 const data = await response.json();
@@ -1084,10 +1181,16 @@
         function selectDatabase(database) {
             selectedDatabase = database;
             localStorage.setItem('selectedDatabase', database);
+            
+            // Actualizar UI
             updateDatabaseInfo();
+            
+            // Recargar lista para mostrar selección
             loadDatabases();
+            
             showMessage('databaseMessage', `✅ Base de datos cambiada a: ${database}`, 'success');
             
+            // Si hay un usuario logueado, recargar sus datos
             if (currentUser) {
                 refreshUserData();
             }
@@ -1155,14 +1258,18 @@
         
         function logout() {
             stopAutoRefresh();
+            
             currentUser = null;
             uploadedFile = null;
             pendingPayment = null;
             isTechLoggedIn = false;
+            
             document.getElementById('techBadge').classList.remove('active');
             document.getElementById('loginSection').style.display = 'block';
             document.getElementById('dashboardSection').style.display = 'none';
             document.getElementById('databaseInfo').style.display = 'none';
+            
+            // Limpiar formularios
             document.getElementById('nombre').value = '';
             document.getElementById('codigo').value = '';
             document.getElementById('telefono').value = '';
@@ -1178,10 +1285,13 @@
         function loadUserData() {
             if (!currentUser) return;
             
+            console.log('📊 Cargando datos del usuario:', currentUser);
+            
             document.getElementById('userName').textContent = currentUser.nombre || 'N/D';
             document.getElementById('userCode').textContent = currentUser.codigo || 'N/D';
             document.getElementById('userPppoe').textContent = currentUser.usuario_pppoe || 'No asignado';
             
+            // ZONA - Versión mejorada
             let zonaNombre = 'Sin zona';
             if (currentUser.zona_nombre) {
                 zonaNombre = currentUser.zona_nombre;
@@ -1192,12 +1302,15 @@
             }
             document.getElementById('userZone').textContent = zonaNombre;
             
+            // PLAN
             const planNombre = currentUser.plan_nombre || 'Sin plan';
             document.getElementById('userPlan').textContent = planNombre;
             
+            // ESTADO
             const estado = currentUser.estado || 'Desconocido';
             document.getElementById('userStatus').textContent = estado;
             
+            // MENSUALIDAD
             if (currentUser.plan_precio !== undefined && currentUser.plan_precio !== null) {
                 const precioBs = parseFloat(currentUser.plan_precio);
                 updateMonthlyFeeDisplay(precioBs);
@@ -1303,10 +1416,13 @@
             
             pagos.forEach(pago => {
                 const row = document.createElement('tr');
+                
                 const fecha = pago.fecha ? new Date(pago.fecha) : new Date();
                 const fechaFormateada = fecha.toLocaleDateString('es-VE');
+                
                 let montoBs = pago.monto_bs || pago.monto || 0;
                 let montoUsd = pago.monto_usd || (montoBs / CONFIG.tasaCambio);
+                
                 let montoMostrar = montoBs;
                 let simboloMostrar = 'Bs.';
                 
@@ -1323,6 +1439,7 @@
                     <td>${pago.referencia || 'N/A'}</td>
                     <td>${pago.metodo || 'Portal Web'}</td>
                 `;
+                
                 tbody.appendChild(row);
             });
             
@@ -1330,10 +1447,12 @@
             document.getElementById('noPayments').style.display = 'none';
         }
         
+        // ================= FUNCIÓN: COPIAR DATOS DE PAGO MÓVIL =================
         function copyAllPagoMovil() {
             const telefono = document.getElementById('pagoMovilTelefono').textContent;
             const cedula = document.getElementById('pagoMovilCedula').textContent;
             const montoElement = document.getElementById('pagoMovilMonto').textContent;
+            
             const montoText = montoElement.replace(/[^0-9,.]/g, '');
             let montoNumerico;
             
@@ -1342,7 +1461,12 @@
             } else if (montoText.includes(',')) {
                 const lastCommaIndex = montoText.lastIndexOf(',');
                 const afterComma = montoText.substring(lastCommaIndex + 1);
-                montoNumerico = afterComma.length === 2 ? montoText.replace(',', '.') : montoText.replace(',', '');
+                
+                if (afterComma.length === 2) {
+                    montoNumerico = montoText.replace(',', '.');
+                } else {
+                    montoNumerico = montoText.replace(',', '');
+                }
             } else {
                 montoNumerico = montoText;
             }
@@ -1353,12 +1477,15 @@
             navigator.clipboard.writeText(textoCompleto).then(() => {
                 const button = document.getElementById('copyAllBtn');
                 const originalHTML = button.innerHTML;
+                
                 button.innerHTML = '<i class="fas fa-check"></i> ¡Copiado!';
                 button.classList.add('success');
+                
                 setTimeout(() => {
                     button.innerHTML = originalHTML;
                     button.classList.remove('success');
                 }, 2000);
+                
                 showMessage('paymentMessage', '✅ Todos los datos copiados en formato Pago Móvil', 'success');
             }).catch(err => {
                 console.error('Error al copiar: ', err);
@@ -1366,30 +1493,47 @@
             });
         }
         
+        // ================= FUNCIÓN PARA OBTENER DATOS DE PAGO POR ZONA =================
         function getPagoMovilData(zona) {
-            if (!zona) return CONFIG.pagosPorZona['los pozos'];
-            const zonaLower = zona.toLowerCase().trim();
-            if (CONFIG.pagosPorZona[zonaLower]) return CONFIG.pagosPorZona[zonaLower];
-            for (const [key, value] of Object.entries(CONFIG.pagosPorZona)) {
-                if (zonaLower.includes(key)) return value;
+            if (!zona) {
+                return CONFIG.pagosPorZona['los pozos'];
             }
+            
+            const zonaLower = zona.toLowerCase().trim();
+            
+            if (CONFIG.pagosPorZona[zonaLower]) {
+                return CONFIG.pagosPorZona[zonaLower];
+            }
+            
+            for (const [key, value] of Object.entries(CONFIG.pagosPorZona)) {
+                if (zonaLower.includes(key)) {
+                    return value;
+                }
+            }
+            
             return CONFIG.pagosPorZona['los pozos'];
         }
         
+        // ================= MODALES =================
         function showPaymentModal() {
             if (!currentUser) {
                 showMessage('paymentMessage', '❌ No hay sesión de usuario activa', 'error');
                 return;
             }
+            
             const userZone = currentUser.zona_nombre || currentUser.zona || 'Sin zona';
             const pagoData = getPagoMovilData(userZone);
+            
             document.getElementById('currentZone').textContent = userZone;
             document.getElementById('pagoMovilBanco').textContent = pagoData.banco;
             document.getElementById('pagoMovilTelefono').textContent = pagoData.telefono;
             document.getElementById('pagoMovilCedula').textContent = pagoData.cedula;
+            
             updatePagoMovilMonto();
+            
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('fechaPago').value = today;
+            
             document.getElementById('paymentModal').style.display = 'flex';
         }
         
@@ -1408,12 +1552,15 @@
         
         function showConfirmationModal() {
             if (!currentUser || !pendingPayment) return;
+            
             const fechaObj = new Date(pendingPayment.fecha);
             const fechaFormateada = fechaObj.toLocaleDateString('es-VE');
+            
             document.getElementById('confirmName').textContent = currentUser.nombre;
             document.getElementById('confirmRef').textContent = pendingPayment.referencia;
             document.getElementById('confirmDate').textContent = fechaFormateada;
             document.getElementById('confirmAmount').textContent = formatCurrency(pendingPayment.monto) + ' Bs.';
+            
             document.getElementById('confirmationModal').style.display = 'flex';
         }
         
@@ -1426,19 +1573,24 @@
             document.getElementById('fileInfo').style.display = 'none';
         }
         
+        // ================= MANEJO DE ARCHIVOS =================
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+            
             if (file.size > 10 * 1024 * 1024) {
                 showMessage('paymentMessage', 'El archivo es demasiado grande (máximo 10MB)', 'error');
                 return;
             }
+            
             const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
             if (!allowedTypes.includes(file.type)) {
                 showMessage('paymentMessage', 'Formato no permitido. Usa JPG, PNG o PDF', 'error');
                 return;
             }
+            
             uploadedFile = file;
+            
             document.getElementById('fileInfo').style.display = 'block';
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = formatFileSize(file.size);
@@ -1456,6 +1608,7 @@
             return (bytes / 1048576).toFixed(2) + ' MB';
         }
         
+        // ================= VALIDACIÓN DE PAGO =================
         function validatePayment() {
             const referencia = document.getElementById('referencia').value.trim();
             const fecha = document.getElementById('fechaPago').value;
@@ -1465,29 +1618,35 @@
                 showMessage('paymentMessage', 'La referencia debe tener al menos 6 caracteres', 'error');
                 return;
             }
+            
             if (!fecha) {
                 showMessage('paymentMessage', 'Selecciona una fecha válida', 'error');
                 return;
             }
+            
             const montoNum = parseFloat(monto);
             if (!monto || isNaN(montoNum) || montoNum <= 0) {
                 showMessage('paymentMessage', 'Ingresa un monto válido', 'error');
                 return;
             }
+            
             if (!uploadedFile) {
                 showMessage('paymentMessage', 'Debes subir el comprobante', 'error');
                 return;
             }
+            
             pendingPayment = { referencia, fecha, monto: montoNum };
             document.getElementById('paymentModal').style.display = 'none';
             showConfirmationModal();
         }
         
+        // ================= FUNCIONES UTILITARIAS =================
         function showMessage(elementId, message, type) {
             const element = document.getElementById(elementId);
             element.textContent = message;
             element.className = `message ${type}`;
             element.style.display = 'block';
+            
             if (type === 'success') {
                 setTimeout(() => {
                     element.style.display = 'none';
@@ -1503,17 +1662,15 @@
             });
         }
         
+        // ================= FUNCIÓN PARA REFRESCAR DATOS DEL USUARIO =================
         async function refreshUserData() {
-            if (!currentUser || !currentUser.usuario_pppoe) return false;
-            
-            if (!CONFIG || !CONFIG.apiUrl) {
-                console.error('❌ CONFIG.apiUrl no disponible en refreshUserData');
+            if (!currentUser || !currentUser.usuario_pppoe) {
                 return false;
             }
 
             try {
-                const url = `${CONFIG.apiUrl}/verify-abonado`;
-                const response = await fetch(url, {
+                // Usando el método directo que funcionaba antes
+                const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -1526,15 +1683,14 @@
                         telefono: currentUser.telefono 
                     })
                 });
-                
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
+
                 const data = await response.json();
 
                 if (data.success) {
                     if (data.tasa_cambio) {
                         CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
-                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
                     }
                     
                     currentUser = {
@@ -1546,13 +1702,17 @@
                     };
 
                     localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
+
                     loadUserData();
                     
                     const deudaBs = data.abonado.deuda_total_bs || 0;
                     const meses = data.deudas ? data.deudas.map(d => d.mes).join(', ') : '';
                     updateDebtDisplay(deudaBs, meses);
                     
-                    if (data.pagos) updatePaymentsTable(data.pagos);
+                    if (data.pagos) {
+                        updatePaymentsTable(data.pagos);
+                    }
+
                     return true;
                 }
                 return false;
@@ -1563,11 +1723,18 @@
             }
         }
 
+        // ================= FUNCIONES PARA REFRESCO AUTOMÁTICO =================
         function startAutoRefresh() {
-            if (refreshInterval) clearInterval(refreshInterval);
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
             refreshInterval = setInterval(async () => {
-                if (currentUser) await refreshUserData();
-                else stopAutoRefresh();
+                if (currentUser) {
+                    await refreshUserData();
+                } else {
+                    stopAutoRefresh();
+                }
             }, 60000);
         }
 
@@ -1578,6 +1745,7 @@
             }
         }
         
+        // ================= ENVÍO A TELEGRAM =================
         async function sendToTelegram() {
             if (!currentUser || !pendingPayment || !uploadedFile) {
                 showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
@@ -1592,11 +1760,16 @@
             try {
                 await sendTelegramMessage();
                 await sendTelegramFile();
+                
                 showMessage('paymentMessage', '✅ Reporte enviado exitosamente a Telegram', 'success');
                 closeModal();
+                
                 setTimeout(() => {
-                    if (currentUser) refreshUserData();
+                    if (currentUser) {
+                        refreshUserData();
+                    }
                 }, 1500);
+                
             } catch (error) {
                 console.error('❌ Error enviando a Telegram:', error);
                 showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
@@ -1625,6 +1798,7 @@
                            `━━━━━━━━━━━━━━━━━━━━\n`;
             
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`;
+            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1636,13 +1810,18 @@
             });
             
             const data = await response.json();
-            if (!data.ok) throw new Error(data.description || 'Error de Telegram');
+            
+            if (!data.ok) {
+                throw new Error(data.description || 'Error de Telegram');
+            }
+            
             return true;
         }
         
         async function sendTelegramFile() {
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
             const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
+            
             const formData = new FormData();
             formData.append('chat_id', CONFIG.telegram.chatId);
             formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
@@ -1655,48 +1834,54 @@
             });
             
             const data = await response.json();
-            if (!data.ok) throw new Error(data.description || 'Error subiendo archivo');
+            
+            if (!data.ok) {
+                throw new Error(data.description || 'Error subiendo archivo');
+            }
+            
             return true;
         }
         
+        // ================= FUNCIONES ASINCRONAS =================
         async function checkApiConnection() {
-            if (!CONFIG || !CONFIG.apiUrl) {
-                console.error('❌ CONFIG.apiUrl no está disponible');
-                document.getElementById('statusIcon').style.color = '#ef4444';
-                document.getElementById('statusText').textContent = 'Error: Configuración';
-                return;
-            }
-            
-            const urlToFetch = CONFIG.apiUrl + '/health';
-            
-            try {
-                const response = await fetch(urlToFetch, {
-                    headers: {
-                        'X-Database': selectedDatabase
-                    }
-                });
-                
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const data = await response.json();
-                
-                if (data.h2?.connected) {
-                    document.getElementById('statusIcon').style.color = '#10b981';
-                    document.getElementById('statusText').textContent = 'Conectado';
-                    if (data.tasa_cambio) {
-                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
-                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
-                    }
-                } else {
-                    document.getElementById('statusIcon').style.color = '#f59e0b';
-                    document.getElementById('statusText').textContent = 'API disponible';
-                }
-            } catch (error) {
-                console.error('❌ Error en checkApiConnection:', error);
-                document.getElementById('statusIcon').style.color = '#f59e0b';
-                document.getElementById('statusText').textContent = 'Verificando...';
-            }
-        }
+              // Usar URL FIJA para esta prueba - IGNORA CONFIG
+              const urlFija = 'https://holy-credit-b4ed.thecrow859.workers.dev/api/health';
+              
+              console.log('🌐 [DIAGNÓSTICO] URL fija:', urlFija);
+              console.log('🌐 [DIAGNÓSTICO] CONFIG.apiUrl actual:', CONFIG.apiUrl);
+              
+              try {
+                  const response = await fetch(urlFija, {
+                      headers: {
+                          'X-Database': selectedDatabase
+                      }
+                  });
+                  
+                  if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                  }
+                  
+                  const data = await response.json();
+                  console.log('📡 [DIAGNÓSTICO] Respuesta exitosa:', data);
+                  
+                  if (data.h2?.connected) {
+                      document.getElementById('statusIcon').style.color = '#10b981';
+                      document.getElementById('statusText').textContent = 'Conectado';
+                      if (data.tasa_cambio) {
+                          CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
+                          document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
+                      }
+                  }
+              } catch (error) {
+                  console.error('❌ [DIAGNÓSTICO] Error completo:', {
+                      message: error.message,
+                      url: urlFija,
+                      stack: error.stack
+                  });
+                  document.getElementById('statusIcon').style.color = '#f59e0b';
+                  document.getElementById('statusText').textContent = 'Error: ' + error.message;
+              }
+          }
         
         async function login() {
             const nombre = document.getElementById('nombre').value.trim();
@@ -1713,6 +1898,7 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
             
             try {
+                // Usando el método directo que funcionaba antes
                 const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
                     method: 'POST',
                     headers: { 
@@ -1728,7 +1914,8 @@
                 if (data.success) {
                     if (data.tasa_cambio) {
                         CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
-                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
+                        document.getElementById('exchangeRate').textContent = 
+                            CONFIG.tasaCambio.toFixed(2);
                     }
                     
                     currentUser = {
@@ -1740,18 +1927,27 @@
                     };
                     
                     localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
+                    
                     showMessage('loginMessage', '✅ Conexión exitosa', 'success');
                     
                     setTimeout(() => {
                         showDashboard();
                         loadUserData();
+                        
                         const deudaBs = data.abonado.deuda_total_bs || 0;
                         const meses = data.deudas ? data.deudas.map(d => d.mes).join(', ') : '';
+                        
                         updateDebtDisplay(deudaBs, meses);
-                        if (data.pagos) updatePaymentsTable(data.pagos);
+                        
+                        if (data.pagos) {
+                            updatePaymentsTable(data.pagos);
+                        }
+                        
                         document.getElementById('statusIcon').style.color = '#10b981';
                         document.getElementById('statusText').textContent = 'Conectado';
+                        
                         startAutoRefresh();
+                        
                     }, 1000);
                     
                 } else {
@@ -1767,69 +1963,6 @@
                 btn.innerHTML = '<i class="fas fa-search"></i> Consultar';
             }
         }
-
-        // ================= INICIALIZACIÓN - AHORA CON CONTROLES DE TIEMPO =================
-        async function inicializarApp() {
-            console.log('🚀 Inicializando aplicación...');
-            console.log('📀 CONFIG:', CONFIG);
-            console.log('📀 API URL:', CONFIG?.apiUrl);
-            
-            // Pequeña pausa para asegurar que todo está listo
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            document.getElementById('comprobante').addEventListener('change', handleFileUpload);
-            updateDatabaseInfo();
-            await checkApiConnection();
-            
-            const savedUser = localStorage.getItem('portal_abonado');
-            if (savedUser) {
-                try {
-                    const userData = JSON.parse(savedUser);
-                    currentUser = userData;
-                    
-                    if (userData.tasa_cambio) {
-                        CONFIG.tasaCambio = parseFloat(userData.tasa_cambio);
-                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
-                    }
-                    
-                    showDashboard();
-                    loadUserData();
-                    
-                    if (userData.deuda_total_bs !== undefined) {
-                        updateDebtDisplay(userData.deuda_total_bs, userData.deuda_meses || '');
-                    }
-                    
-                    if (userData.pagos_cache) {
-                        updatePaymentsTable(userData.pagos_cache);
-                    }
-                    
-                    await refreshUserData();
-                    startAutoRefresh();
-                    
-                } catch (e) {
-                    console.error('Error cargando sesión:', e);
-                    localStorage.removeItem('portal_abonado');
-                }
-            }
-            
-            setInterval(async () => {
-                try {
-                    const response = await fetch(`${CONFIG.apiUrl}/tasa-cambio`, {
-                        headers: {
-                            'X-Database': selectedDatabase
-                        }
-                    });
-                    const data = await response.json();
-                    if (data.success && data.tasa_cambio !== CONFIG.tasaCambio) {
-                        CONFIG.tasaCambio = data.tasa_cambio;
-                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
-                        if (currentUser) await refreshUserData();
-                    }
-                } catch (error) {}
-            }, 30000);
-        }
-
-        document.addEventListener('DOMContentLoaded', inicializarApp);
     </script>
 </body>
 </html>
