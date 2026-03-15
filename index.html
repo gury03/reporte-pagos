@@ -1591,7 +1591,7 @@
                 
                 const verifyData = await verifyResponse.json();
                 
-                // 2) Si el pago ya existe, mostrar notificación y NO continuar
+                // 2) Si el pago YA existe, mostrar mensaje y DETENER el proceso
                 if (verifyData.exists) {
                     console.log('⚠️ Pago duplicado detectado:', verifyData);
                     
@@ -1610,7 +1610,7 @@
                         }
                     }
                     
-                    // Mostrar mensaje de error en el modal de pago
+                    // Mostrar mensaje de error
                     showMessage('paymentMessage', mensaje, 'error');
                     
                     // Cerrar modales después de 3 segundos
@@ -1621,7 +1621,7 @@
                     
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-                    return;
+                    return; // ✅ SALIR DE LA FUNCIÓN - NO ENVIAR A TELEGRAM
                 }
                 
                 // 3) Si NO existe, proceder con el envío a Telegram y registro
@@ -1666,6 +1666,13 @@
                         closeModal();
                         if (currentUser) refreshUserData();
                     }, 2000);
+                } else if (registerData.duplicate) {
+                    // Si por alguna razón llegó un duplicado (condición de carrera)
+                    showMessage('paymentMessage', registerData.message, 'error');
+                    setTimeout(() => {
+                        closePaymentModal();
+                        closeModal();
+                    }, 3000);
                 } else {
                     throw new Error(registerData.message || 'Error al registrar pago');
                 }
