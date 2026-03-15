@@ -1568,33 +1568,109 @@
             }
         }
         
-        async function sendToTelegram() {
-            if (!currentUser || !pendingPayment || !uploadedFile) {
-                showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
-                closeModal();
-                return;
-            }
-            
-            const btn = document.getElementById('btnConfirmTelegram');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-            
-            try {
-                await sendTelegramMessage();
-                await sendTelegramFile();
-                showMessage('paymentMessage', '✅ Reporte enviado exitosamente a Telegram', 'success');
-                closeModal();
-                setTimeout(() => {
-                    if (currentUser) refreshUserData();
-                }, 1500);
-            } catch (error) {
-                console.error('❌ Error enviando a Telegram:', error);
-                showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-            }
+async function sendToTelegram() {
+    if (!currentUser || !pendingPayment || !uploadedFile) {
+        showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
+        closeModal();
+        return;
+    }
+    
+    const btn = document.getElementById('btnConfirmTelegram');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    
+    try {
+        // 1) Enviar mensaje y comprobante a Telegram
+        await sendTelegramMessage();
+        await sendTelegramFile();
+
+        // 2) Registrar pago en la base de datos (tabla pagos_online)
+        try {
+            await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Database': selectedDatabase
+                },
+                body: JSON.stringify({
+                    codigo: currentUser.usuario_pppoe,              // se usa como usuario_pppoe
+                    referencia: pendingPayment.referencia,
+                    fecha_pago: pendingPayment.fecha,               // yyyy-mm-dd
+                    monto_bs: pendingPayment.monto,                 // número en Bs
+                    metodo_pago: 'Pago Móvil (Portal Web)',
+                    detalle: `Pago reportado desde portal por ${currentUser.nombre}`
+                })
+            });
+            // No detengo el flujo si falla, solo queda registrado en Telegram
+        } catch (e) {
+            console.error('⚠️ Error registrando pago_online:', e);
         }
+
+        showMessage('paymentMessage', '✅ Reporte enviado y pago registrado (pendiente de confirmación)', 'success');
+        closeModal();
+        setTimeout(() => {
+            if (currentUser) refreshUserData();
+        }, 1500);
+    } catch (error) {
+        console.error('❌ Error enviando a Telegram:', error);
+        showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+    }
+}async function sendToTelegram() {
+    if (!currentUser || !pendingPayment || !uploadedFile) {
+        showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
+        closeModal();
+        return;
+    }
+    
+    const btn = document.getElementById('btnConfirmTelegram');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    
+    try {
+        // 1) Enviar mensaje y comprobante a Telegram
+        await sendTelegramMessage();
+        await sendTelegramFile();
+
+        // 2) Registrar pago en la base de datos (tabla pagos_online)
+        try {
+            await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Database': selectedDatabase
+                },
+                body: JSON.stringify({
+                    codigo: currentUser.usuario_pppoe,              // se usa como usuario_pppoe
+                    referencia: pendingPayment.referencia,
+                    fecha_pago: pendingPayment.fecha,               // yyyy-mm-dd
+                    monto_bs: pendingPayment.monto,                 // número en Bs
+                    metodo_pago: 'Pago Móvil (Portal Web)',
+                    detalle: `Pago reportado desde portal por ${currentUser.nombre}`
+                })
+            });
+            // No detengo el flujo si falla, solo queda registrado en Telegram
+        } catch (e) {
+            console.error('⚠️ Error registrando pago_online:', e);
+        }
+
+        showMessage('paymentMessage', '✅ Reporte enviado y pago registrado (pendiente de confirmación)', 'success');
+        closeModal();
+        setTimeout(() => {
+            if (currentUser) refreshUserData();
+        }, 1500);
+    } catch (error) {
+        console.error('❌ Error enviando a Telegram:', error);
+        showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+    }
+}
         
         async function sendTelegramMessage() {
             const { referencia, fecha, monto } = pendingPayment;
