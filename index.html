@@ -1559,7 +1559,7 @@
             }
         }
 
-        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA - ORDEN CORRECTO) =================
+        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA) =================
         async function sendToTelegram() {
             if (!currentUser || !pendingPayment || !uploadedFile) {
                 showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
@@ -1591,7 +1591,7 @@
                 
                 const verifyData = await verifyResponse.json();
                 
-                // 2) Si el pago YA existe, mostrar mensaje y DETENER el proceso
+                // 2) Si el pago YA existe, mostrar mensaje y TERMINAR AQUÍ
                 if (verifyData.exists) {
                     console.log('⚠️ Pago duplicado detectado:', verifyData);
                     
@@ -1613,7 +1613,7 @@
                     // Mostrar mensaje de error
                     showMessage('paymentMessage', mensaje, 'error');
                     
-                    // Cerrar modales después de 3 segundos
+                    // Cerrar modales
                     setTimeout(() => {
                         closePaymentModal();
                         closeModal();
@@ -1621,11 +1621,11 @@
                     
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-                    return; // ✅ SALIR DE LA FUNCIÓN - NO ENVIAR A TELEGRAM
+                    return; // ✅ SALIR AQUÍ, NO ENVIAR NADA A TELEGRAM
                 }
                 
-                // 3) Si NO existe, proceder con el envío a Telegram y registro
-                console.log('✅ Pago no existe, procediendo con el envío...');
+                // 3) Si NO existe, proceder con el envío a Telegram
+                console.log('✅ Pago no existe, enviando a Telegram...');
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando a Telegram...';
                 
                 // Enviar mensaje a Telegram
@@ -1660,19 +1660,11 @@
                     console.log('✅ Pago registrado en pagos_online:', registerData);
                     showMessage('paymentMessage', '✅ ' + registerData.message, 'success');
                     
-                    // Cerrar modal y refrescar datos
                     setTimeout(() => {
                         closePaymentModal();
                         closeModal();
                         if (currentUser) refreshUserData();
                     }, 2000);
-                } else if (registerData.duplicate) {
-                    // Si por alguna razón llegó un duplicado (condición de carrera)
-                    showMessage('paymentMessage', registerData.message, 'error');
-                    setTimeout(() => {
-                        closePaymentModal();
-                        closeModal();
-                    }, 3000);
                 } else {
                     throw new Error(registerData.message || 'Error al registrar pago');
                 }
