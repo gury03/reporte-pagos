@@ -865,7 +865,7 @@
             </button>
             
             <h2><i class="fas fa-check-circle"></i> Confirmar Envío</h2>
-            <p>Revisa la información antes de enviar a Telegram:</p>
+            <p>Revisa la información antes de enviar:</p>
             
             <div style="background: var(--light); padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p><strong>Abonado:</strong> <span id="confirmName"></span></p>
@@ -1559,7 +1559,7 @@
             }
         }
 
-        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA - SIN DUPLICADOS) =================
+        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA - ORDEN CORRECTO) =================
         async function sendToTelegram() {
             if (!currentUser || !pendingPayment || !uploadedFile) {
                 showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
@@ -1569,90 +1569,116 @@
             
             const btn = document.getElementById('btnConfirmTelegram');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
             
             try {
-                // 1) Enviar mensaje y comprobante a Telegram
-                await sendTelegramMessage();
-                await sendTelegramFile();
-
-                // 2) Registrar pago en la base de datos (tabla pagos_online)
-                try {
-                    const response = await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-Database': selectedDatabase
-                        },
-                        body: JSON.stringify({
-                            codigo: currentUser.usuario_pppoe,
-                            referencia: pendingPayment.referencia,
-                            fecha_pago: pendingPayment.fecha,
-                            monto_bs: pendingPayment.monto,
-                            metodo_pago: 'Pago Móvil (Portal Web)',
-                            detalle: `Pago reportado desde portal por ${currentUser.nombre}`
-                        })
-                    });
+                // 1) PRIMERO: Verificar en la base de datos si el pago ya existe
+                console.log('🔍 Verificando si el pago ya existe...');
+                
+                const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Database': selectedDatabase
+                    },
+                    body: JSON.stringify({
+                        codigo: currentUser.usuario_pppoe,
+                        referencia: pendingPayment.referencia,
+                        monto_bs: pendingPayment.monto
+                    })
+                });
+                
+                const verifyData = await verifyResponse.json();
+                
+                // 2) Si el pago ya existe, mostrar notificación y NO continuar
+                if (verifyData.exists) {
+                    console.log('⚠️ Pago duplicado detectado:', verifyData);
                     
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        console.log('✅ Pago registrado en pagos_online:', data);
-                        showMessage('paymentMessage', '✅ ' + data.message, 'success');
-                        
-                        // Cerrar modal y refrescar datos
-                        setTimeout(() => {
-                            closePaymentModal();
-                            closeModal();
-                            if (currentUser) refreshUserData();
-                        }, 2000);
-                        
-                    } else if (data.duplicate) {
-                        // Manejar pagos duplicados
-                        let mensaje = data.message;
-                        
-                        if (data.table === 'pagos') {
-                            mensaje = '❌ ESTE PAGO YA FUE REGISTRADO Y CONFIRMADO';
-                        } else if (data.table === 'pagos_online') {
-                            if (data.estado === 'PENDIENTE') {
-                                mensaje = '⏳ YA REPORTaste este pago. Está siendo verificado';
-                            } else if (data.estado === 'CONFIRMADO') {
-                                mensaje = '✅ ESTE PAGO YA FUE CONFIRMADO';
-                            } else if (data.estado === 'RECHAZADO') {
-                                mensaje = '❌ ESTE PAGO FUE RECHAZADO. Contacta a soporte';
-                            }
+                    let mensaje = '';
+                    if (verifyData.table === 'pagos') {
+                        mensaje = '❌ ESTE PAGO YA FUE REGISTRADO Y CONFIRMADO';
+                    } else if (verifyData.table === 'pagos_online') {
+                        if (verifyData.estado === 'PENDIENTE') {
+                            mensaje = '⏳ YA REPORTaste este pago. Está siendo verificado';
+                        } else if (verifyData.estado === 'CONFIRMADO') {
+                            mensaje = '✅ ESTE PAGO YA FUE CONFIRMADO';
+                        } else if (verifyData.estado === 'RECHAZADO') {
+                            mensaje = '❌ ESTE PAGO FUE RECHAZADO. Contacta a soporte';
+                        } else {
+                            mensaje = '❌ YA EXISTE UN REGISTRO DE ESTE PAGO';
                         }
-                        
-                        showMessage('paymentMessage', mensaje, 'error');
-                        
-                        setTimeout(() => {
-                            closePaymentModal();
-                            closeModal();
-                        }, 3000);
-                        
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-                        return;
-                        
-                    } else {
-                        showMessage('paymentMessage', '❌ Error: ' + (data.message || 'Error desconocido'), 'error');
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-                        return;
                     }
                     
-                } catch (e) {
-                    console.error('⚠️ Error registrando pago_online:', e);
-                    showMessage('paymentMessage', '❌ Error de conexión con el servidor', 'error');
+                    // Mostrar mensaje de error en el modal de pago
+                    showMessage('paymentMessage', mensaje, 'error');
+                    
+                    // Cerrar modales después de 3 segundos
+                    setTimeout(() => {
+                        closePaymentModal();
+                        closeModal();
+                    }, 3000);
+                    
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
                     return;
                 }
                 
+                // 3) Si NO existe, proceder con el envío a Telegram y registro
+                console.log('✅ Pago no existe, procediendo con el envío...');
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando a Telegram...';
+                
+                // Enviar mensaje a Telegram
+                await sendTelegramMessage();
+                
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo comprobante...';
+                await sendTelegramFile();
+                
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando en base de datos...';
+                
+                // Registrar en pagos_online
+                const registerResponse = await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Database': selectedDatabase
+                    },
+                    body: JSON.stringify({
+                        codigo: currentUser.usuario_pppoe,
+                        referencia: pendingPayment.referencia,
+                        fecha_pago: pendingPayment.fecha,
+                        monto_bs: pendingPayment.monto,
+                        metodo_pago: 'Pago Móvil (Portal Web)',
+                        detalle: `Pago reportado desde portal por ${currentUser.nombre}`
+                    })
+                });
+                
+                const registerData = await registerResponse.json();
+                
+                if (registerData.success) {
+                    console.log('✅ Pago registrado en pagos_online:', registerData);
+                    showMessage('paymentMessage', '✅ ' + registerData.message, 'success');
+                    
+                    // Cerrar modal y refrescar datos
+                    setTimeout(() => {
+                        closePaymentModal();
+                        closeModal();
+                        if (currentUser) refreshUserData();
+                    }, 2000);
+                } else {
+                    throw new Error(registerData.message || 'Error al registrar pago');
+                }
+                
             } catch (error) {
-                console.error('❌ Error enviando a Telegram:', error);
-                showMessage('paymentMessage', '❌ Error al enviar a Telegram: ' + error.message, 'error');
+                console.error('❌ Error en proceso de pago:', error);
+                showMessage('paymentMessage', '❌ Error: ' + error.message, 'error');
+                
+                setTimeout(() => {
+                    closePaymentModal();
+                    closeModal();
+                }, 3000);
+            } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
             }
