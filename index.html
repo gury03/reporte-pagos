@@ -1559,7 +1559,7 @@
             }
         }
 
-        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA) =================
+        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA DEFINITIVA) =================
         async function sendToTelegram() {
             if (!currentUser || !pendingPayment || !uploadedFile) {
                 showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
@@ -1591,9 +1591,9 @@
                 
                 const verifyData = await verifyResponse.json();
                 
-                // 2) Si el pago YA existe, mostrar mensaje y TERMINAR AQUÍ
+                // 2) Si el pago YA existe, mostrar mensaje y TERMINAR AQUÍ (sin enviar a Telegram)
                 if (verifyData.exists) {
-                    console.log('⚠️ Pago duplicado detectado:', verifyData);
+                    console.log('🚫 PAGO DUPLICADO DETECTADO - CANCELANDO ENVÍO');
                     
                     let mensaje = '';
                     if (verifyData.table === 'pagos') {
@@ -1610,10 +1610,10 @@
                         }
                     }
                     
-                    // Mostrar mensaje de error
+                    // Mostrar mensaje de error en el modal
                     showMessage('paymentMessage', mensaje, 'error');
                     
-                    // Cerrar modales
+                    // Cerrar modales después de 3 segundos
                     setTimeout(() => {
                         closePaymentModal();
                         closeModal();
@@ -1621,11 +1621,11 @@
                     
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-                    return; // ✅ SALIR AQUÍ, NO ENVIAR NADA A TELEGRAM
+                    return; // ✅ SALIR AQUÍ - NO ENVIAR NADA A TELEGRAM
                 }
                 
                 // 3) Si NO existe, proceder con el envío a Telegram
-                console.log('✅ Pago no existe, enviando a Telegram...');
+                console.log('✅ Pago no existe, procediendo con el envío a Telegram...');
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando a Telegram...';
                 
                 // Enviar mensaje a Telegram
