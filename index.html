@@ -1443,7 +1443,8 @@
             return (bytes / 1048576).toFixed(2) + ' MB';
         }
         
-        function validatePayment() {
+        // ================= VALIDAR PAGO (CON VERIFICACIÓN ANTES DE CONFIRMAR) =================
+        async function validatePayment() {
             const referencia = document.getElementById('referencia').value.trim();
             const fecha = document.getElementById('fechaPago').value;
             const monto = document.getElementById('monto').value;
@@ -1465,9 +1466,67 @@
                 showMessage('paymentMessage', 'Debes subir el comprobante', 'error');
                 return;
             }
-            pendingPayment = { referencia, fecha, monto: montoNum };
-            document.getElementById('paymentModal').style.display = 'none';
-            showConfirmationModal();
+            
+            // MOSTRAR MENSAJE DE VERIFICACIÓN
+            const btn = document.getElementById('btnSendPayment');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+            
+            try {
+                // VERIFICAR ANTES DE MOSTRAR EL MODAL DE CONFIRMACIÓN
+                console.log('🔍 Verificando pago antes de confirmar...');
+                
+                const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Database': selectedDatabase
+                    },
+                    body: JSON.stringify({
+                        codigo: currentUser.usuario_pppoe,
+                        referencia: referencia,
+                        monto_bs: montoNum
+                    })
+                });
+                
+                const verifyData = await verifyResponse.json();
+                console.log('📊 Resultado verificación:', verifyData);
+                
+                // SI YA EXISTE, MOSTRAR ERROR Y NO MOSTRAR MODAL DE CONFIRMACIÓN
+                if (verifyData.exists) {
+                    let mensaje = '';
+                    if (verifyData.table === 'pagos') {
+                        mensaje = '❌ ESTE PAGO YA FUE REGISTRADO Y CONFIRMADO';
+                    } else if (verifyData.table === 'pagos_online') {
+                        if (verifyData.estado === 'PENDIENTE') {
+                            mensaje = '⏳ YA REPORTaste este pago. Está siendo verificado';
+                        } else if (verifyData.estado === 'CONFIRMADO') {
+                            mensaje = '✅ ESTE PAGO YA FUE CONFIRMADO';
+                        } else if (verifyData.estado === 'RECHAZADO') {
+                            mensaje = '❌ ESTE PAGO FUE RECHAZADO. Contacta a soporte';
+                        }
+                    }
+                    
+                    showMessage('paymentMessage', mensaje, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    return; // SALIR AQUÍ - NO MOSTRAR MODAL DE CONFIRMACIÓN
+                }
+                
+                // SI NO EXISTE, GUARDAR PENDING Y MOSTRAR MODAL DE CONFIRMACIÓN
+                pendingPayment = { referencia, fecha, monto: montoNum };
+                document.getElementById('paymentModal').style.display = 'none';
+                showConfirmationModal();
+                
+            } catch (error) {
+                console.error('❌ Error en verificación:', error);
+                showMessage('paymentMessage', '❌ Error al verificar el pago. Intenta de nuevo.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
         }
         
         function showMessage(elementId, message, type) {
