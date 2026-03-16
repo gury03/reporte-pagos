@@ -1837,9 +1837,14 @@
         }
         
         async function refreshUserData() {
-            if (!currentUser || !currentUser.usuario_pppoe) return false;
+            if (!currentUser || !currentUser.usuario_pppoe) {
+                console.log('⚠️ No hay usuario para refrescar');
+                return false;
+            }
             
             try {
+                console.log('🔄 Refrescando datos para:', currentUser.usuario_pppoe);
+                
                 const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
                     method: 'POST',
                     headers: { 
@@ -1850,42 +1855,57 @@
                     body: JSON.stringify({ 
                         nombre: currentUser.nombre,
                         codigo: currentUser.usuario_pppoe, 
-                        telefono: currentUser.telefono 
+                        telefono: currentUser.telefono || '' 
                     })
                 });
                 
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
                 const data = await response.json();
+                console.log('📊 Datos refrescados:', data);
 
                 if (data.success) {
+                    // Actualizar tasa de cambio
                     if (data.tasa_cambio) {
                         CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
                         document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
                     }
                     
+                    // Actualizar currentUser con los nuevos datos
                     currentUser = {
                         ...data.abonado,
-                        tasa_cambio: data.tasa_cambio,
+                        tasa_cambio: data.tasa_cambio || CONFIG.tasaCambio,
                         deuda_total_bs: data.abonado.deuda_total_bs || 0,
                         deuda_meses: data.deudas ? data.deudas.map(d => d.mes).join(', ') : '',
                         pagos_cache: data.pagos || []
                     };
 
+                    // Guardar en localStorage
                     localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
+                    
+                    // Actualizar UI
                     loadUserData();
                     
                     const deudaBs = data.abonado.deuda_total_bs || 0;
                     const meses = data.deudas ? data.deudas.map(d => d.mes).join(', ') : '';
                     updateDebtDisplay(deudaBs, meses);
                     
-                    if (data.pagos) updatePaymentsTable(data.pagos);
+                    if (data.pagos) {
+                        updatePaymentsTable(data.pagos);
+                    }
+                    
+                    console.log('✅ Datos actualizados correctamente');
                     return true;
+                } else {
+                    console.log('⚠️ Error en respuesta:', data.message);
+                    return false;
                 }
-                return false;
                 
             } catch (error) {
-                console.error('❌ Error en refreshUserData:', error);
+                console.error('❌ Error en refreshUserData:', error.message);
+                // No mostrar alerta aquí para no molestar al usuario
                 return false;
             }
         }
@@ -1893,9 +1913,16 @@
         function startAutoRefresh() {
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(async () => {
-                if (currentUser) await refreshUserData();
-                else stopAutoRefresh();
-            }, 60000);
+                if (currentUser) {
+                    try {
+                        await refreshUserData();
+                    } catch (e) {
+                        console.log('⚠️ Error en auto-refresh:', e.message);
+                    }
+                } else {
+                    stopAutoRefresh();
+                }
+            }, 60000); // Cada 60 segundos
         }
 
         function stopAutoRefresh() {
@@ -2006,6 +2033,7 @@
         }
 
         // ================= INICIALIZACIÓN =================
+        // ================= INICIALIZACIÓN =================
         async function inicializarApp() {
             console.log('🚀 Inicializando aplicación...');
             
@@ -2035,7 +2063,15 @@
                         updatePaymentsTable(userData.pagos_cache);
                     }
                     
-                    await refreshUserData();
+                    // Intentar refrescar datos, pero no detener la app si falla
+                    setTimeout(async () => {
+                        try {
+                            await refreshUserData();
+                        } catch (e) {
+                            console.log('⚠️ No se pudo refrescar datos iniciales');
+                        }
+                    }, 1000);
+                    
                     startAutoRefresh();
                     
                 } catch (e) {
@@ -2044,6 +2080,7 @@
                 }
             }
             
+            // Actualizar tasa de cambio cada 30 segundos
             setInterval(async () => {
                 try {
                     const response = await fetch(`${CONFIG.apiUrl}/tasa-cambio`, {
@@ -2055,9 +2092,17 @@
                     if (data.success && data.tasa_cambio !== CONFIG.tasaCambio) {
                         CONFIG.tasaCambio = data.tasa_cambio;
                         document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
-                        if (currentUser) await refreshUserData();
+                        if (currentUser) {
+                            // Actualizar display sin hacer fetch completo
+                            updateDebtDisplay(currentUser.deuda_total_bs, currentUser.deuda_meses || '');
+                            if (currentUser.plan_precio) {
+                                updateMonthlyFeeDisplay(currentUser.plan_precio);
+                            }
+                        }
                     }
-                } catch (error) {}
+                } catch (error) {
+                    // Ignorar errores de tasa de cambio
+                }
             }, 30000);
         }
 
