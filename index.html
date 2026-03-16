@@ -1449,6 +1449,7 @@
             const fecha = document.getElementById('fechaPago').value;
             const monto = document.getElementById('monto').value;
             
+            // Validaciones
             if (!referencia || referencia.length < 6) {
                 showMessage('paymentMessage', 'La referencia debe tener al menos 6 caracteres', 'error');
                 return;
@@ -1467,6 +1468,24 @@
                 return;
             }
             
+            // Verificar que el usuario está autenticado
+            if (!currentUser || !currentUser.id) {
+                showMessage('paymentMessage', '❌ Error de sesión. Por favor, inicia sesión nuevamente.', 'error');
+                return;
+            }
+            
+            // Verificar deuda
+            if (!currentUser.deuda_total_bs || currentUser.deuda_total_bs <= 0) {
+                showMessage('paymentMessage', '✅ Usted no tiene deudas pendientes', 'success');
+                return;
+            }
+            
+            // Verificar que el monto no exceda la deuda (opcional, con margen)
+            if (montoNum > currentUser.deuda_total_bs * 1.05) { // 5% de margen
+                showMessage('paymentMessage', `⚠️ El monto (Bs. ${formatCurrency(montoNum)}) excede la deuda (Bs. ${formatCurrency(currentUser.deuda_total_bs)})`, 'error');
+                return;
+            }
+            
             // MOSTRAR MENSAJE DE VERIFICACIÓN
             const btn = document.getElementById('btnSendPayment');
             const originalText = btn.innerHTML;
@@ -1474,8 +1493,14 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
             
             try {
-                // VERIFICAR ANTES DE MOSTRAR EL MODAL DE CONFIRMACIÓN
+                // VERIFICAR CON EL SERVIDOR USANDO ID_ABONADO
                 console.log('🔍 Verificando pago antes de confirmar...');
+                
+                const verifyPayload = {
+                    id_abonado: currentUser.id,  // Usamos el ID del abonado
+                    referencia: referencia,
+                    monto_bs: montoNum
+                };
                 
                 const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
                     method: 'POST',
@@ -1484,41 +1509,38 @@
                         'Accept': 'application/json',
                         'X-Database': selectedDatabase
                     },
-                    body: JSON.stringify({
-                        codigo: currentUser.usuario_pppoe,
-                        referencia: referencia,
-                        monto_bs: montoNum
-                    })
+                    body: JSON.stringify(verifyPayload)
                 });
                 
                 const verifyData = await verifyResponse.json();
                 console.log('📊 Resultado verificación:', verifyData);
                 
-                // SI YA EXISTE, MOSTRAR ERROR Y NO MOSTRAR MODAL DE CONFIRMACIÓN
+                // SI YA EXISTE, MOSTRAR ERROR
                 if (verifyData.exists) {
-                    let mensaje = '';
-                    if (verifyData.table === 'pagos') {
-                        mensaje = '❌ ESTE PAGO YA FUE REGISTRADO Y CONFIRMADO';
-                    } else if (verifyData.table === 'pagos_online') {
-                        if (verifyData.estado === 'PENDIENTE') {
-                            mensaje = '⏳ YA REPORTaste este pago. Está siendo verificado';
-                        } else if (verifyData.estado === 'CONFIRMADO') {
-                            mensaje = '✅ ESTE PAGO YA FUE CONFIRMADO';
-                        } else if (verifyData.estado === 'RECHAZADO') {
-                            mensaje = '❌ ESTE PAGO FUE RECHAZADO. Contacta a soporte';
-                        }
-                    }
-                    
-                    showMessage('paymentMessage', mensaje, 'error');
+                    showMessage('paymentMessage', verifyData.message || '❌ Este pago ya fue reportado', 'error');
                     btn.disabled = false;
                     btn.innerHTML = originalText;
-                    return; // SALIR AQUÍ - NO MOSTRAR MODAL DE CONFIRMACIÓN
+                    return;
                 }
                 
-                // SI NO EXISTE, GUARDAR PENDING Y MOSTRAR MODAL DE CONFIRMACIÓN
-                pendingPayment = { referencia, fecha, monto: montoNum };
+                // SI NO EXISTE, GUARDAR Y MOSTRAR MODAL DE CONFIRMACIÓN
+                pendingPayment = { 
+                    referencia: referencia, 
+                    fecha: fecha, 
+                    monto: montoNum 
+                };
+                
+                console.log('✅ Pago válido, mostrando confirmación:', pendingPayment);
+                
+                // Actualizar modal de confirmación
+                document.getElementById('confirmName').textContent = currentUser.nombre;
+                document.getElementById('confirmRef').textContent = referencia;
+                document.getElementById('confirmDate').textContent = new Date(fecha).toLocaleDateString('es-VE');
+                document.getElementById('confirmAmount').textContent = formatCurrency(montoNum) + ' Bs.';
+                
+                // Cerrar modal de pago y abrir modal de confirmación
                 document.getElementById('paymentModal').style.display = 'none';
-                showConfirmationModal();
+                document.getElementById('confirmationModal').style.display = 'flex';
                 
             } catch (error) {
                 console.error('❌ Error en verificación:', error);
@@ -1623,8 +1645,23 @@
             console.log('🚀 INICIANDO PROCESO DE PAGO');
             
             // Validación inicial
-            if (!currentUser || !pendingPayment || !uploadedFile) {
-                showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
+            if (!currentUser) {
+                console.error('❌ No hay usuario autenticado');
+                showMessage('paymentMessage', '❌ Debes iniciar sesión primero', 'error');
+                closeModal();
+                return;
+            }
+
+            if (!pendingPayment) {
+                console.error('❌ No hay datos de pago pendientes');
+                showMessage('paymentMessage', '❌ Error: Datos de pago no encontrados', 'error');
+                closeModal();
+                return;
+            }
+
+            if (!uploadedFile) {
+                console.error('❌ No hay comprobante');
+                showMessage('paymentMessage', '❌ Debes subir el comprobante', 'error');
                 closeModal();
                 return;
             }
@@ -1635,14 +1672,15 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
             
             try {
-                // PASO 1: VERIFICAR ANTES QUE NADA
-                console.log('🔍 PASO 1: Verificando si el pago ya existe...');
+                // PASO 1: VERIFICACIÓN CON ID_ABONADO
+                console.log('🔍 VERIFICANDO PAGO DUPLICADO CON ID:', currentUser.id);
                 
                 const verifyPayload = {
-                    id_abonado: currentUser.id,
+                    id_abonado: currentUser.id,  // Usamos el ID del abonado autenticado
                     referencia: pendingPayment.referencia,
                     monto_bs: pendingPayment.monto
                 };
+                
                 console.log('📦 Payload verificación:', verifyPayload);
                 
                 const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
@@ -1662,70 +1700,68 @@
                 const verifyData = await verifyResponse.json();
                 console.log('📊 Resultado verificación:', verifyData);
                 
-                // PASO 2: SI YA EXISTE, DETENER TODO AQUÍ
+                // PASO 2: SI YA EXISTE, DETENER
                 if (verifyData.exists) {
-                    console.log('🚫 PASO 2: PAGO DUPLICADO - DETENIENDO PROCESO');
+                    console.log('🚫 PAGO DUPLICADO - PROCESO DETENIDO');
                     
-                    let mensaje = '';
-                    if (verifyData.table === 'pagos') {
-                        mensaje = '❌ ESTE PAGO YA FUE REGISTRADO Y CONFIRMADO';
-                    } else if (verifyData.table === 'pagos_online') {
-                        if (verifyData.estado === 'PENDIENTE') {
-                            mensaje = '⏳ YA REPORTaste este pago. Está siendo verificado';
-                        } else if (verifyData.estado === 'CONFIRMADO') {
-                            mensaje = '✅ ESTE PAGO YA FUE CONFIRMADO';
-                        } else if (verifyData.estado === 'RECHAZADO') {
-                            mensaje = '❌ ESTE PAGO FUE RECHAZADO. Contacta a soporte';
-                        }
-                    }
+                    let mensaje = verifyData.message || '❌ Este pago ya fue reportado';
+                    showMessage('paymentMessage', mensaje, 'error');
                     
-                    // Mostrar mensaje en el modal de pago (no en el de confirmación)
-                    const paymentMsg = document.getElementById('paymentMessage');
-                    paymentMsg.textContent = mensaje;
-                    paymentMsg.className = 'message error';
-                    paymentMsg.style.display = 'block';
-                    
-                    // Cerrar el modal de confirmación y volver al modal de pago
+                    // Cerrar modales
                     closeModal();
-                    
-                    // Deshabilitar el botón de enviar en el modal de pago temporalmente
-                    const sendBtn = document.getElementById('btnSendPayment');
-                    if (sendBtn) {
-                        sendBtn.disabled = true;
-                        setTimeout(() => {
-                            sendBtn.disabled = false;
-                        }, 3000);
-                    }
+                    closePaymentModal();
                     
                     btn.disabled = false;
                     btn.innerHTML = originalText;
-                    return; // SALIR TOTALMENTE - NO CONTINUAR
+                    return;
                 }
                 
-                // PASO 3: SI NO EXISTE, PROCEDER CON EL ENVÍO
-                console.log('✅ PASO 3: Pago no existe, procediendo con envío...');
+                // PASO 3: VERIFICAR QUE TENGA DEUDA
+                if (!currentUser.deuda_total_bs || currentUser.deuda_total_bs <= 0) {
+                    console.log('🚫 INTENTO DE PAGO SIN DEUDA');
+                    showMessage('paymentMessage', '✅ Usted no tiene deudas pendientes', 'success');
+                    closeModal();
+                    closePaymentModal();
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    return;
+                }
+                
+                // PASO 4: PROCEDER CON EL ENVÍO
+                console.log('✅ VERIFICACIÓN EXITOSA - Enviando a Telegram...');
                 
                 // Cerrar modal de confirmación
                 closeModal();
                 
-                // Mostrar mensaje de proceso en el modal de pago
+                // Mostrar progreso en modal de pago
+                document.getElementById('paymentModal').style.display = 'flex';
                 const paymentMsg = document.getElementById('paymentMessage');
-                paymentMsg.textContent = '⏳ Enviando información a Telegram...';
+                
+                // Enviar mensaje a Telegram
+                paymentMsg.textContent = '⏳ Enviando información...';
                 paymentMsg.className = 'message success';
                 paymentMsg.style.display = 'block';
                 
-                // Enviar a Telegram
-                console.log('📤 Enviando mensaje a Telegram...');
                 await sendTelegramMessage();
-                console.log('✅ Mensaje enviado');
                 
+                // Subir comprobante
                 paymentMsg.textContent = '⏳ Subiendo comprobante...';
                 await sendTelegramFile();
-                console.log('✅ Comprobante subido');
-                
-                paymentMsg.textContent = '⏳ Registrando en base de datos...';
                 
                 // Registrar en base de datos
+                paymentMsg.textContent = '⏳ Registrando en sistema...';
+                
+                const registerPayload = {
+                    id_abonado: currentUser.id,
+                    referencia: pendingPayment.referencia,
+                    fecha_pago: pendingPayment.fecha,
+                    monto_bs: pendingPayment.monto,
+                    metodo_pago: 'Pago Móvil (Portal Web)',
+                    detalle: `Pago reportado desde portal por ${currentUser.nombre}`
+                };
+                
+                console.log('📦 Payload registro:', registerPayload);
+                
                 const registerResponse = await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
                     method: 'POST',
                     headers: {
@@ -1733,42 +1769,33 @@
                         'Accept': 'application/json',
                         'X-Database': selectedDatabase
                     },
-                    body: JSON.stringify({
-                        codigo: currentUser.usuario_pppoe,
-                        referencia: pendingPayment.referencia,
-                        fecha_pago: pendingPayment.fecha,
-                        monto_bs: pendingPayment.monto,
-                        metodo_pago: 'Pago Móvil (Portal Web)',
-                        detalle: `Pago reportado desde portal por ${currentUser.nombre}`
-                    })
+                    body: JSON.stringify(registerPayload)
                 });
                 
                 const registerData = await registerResponse.json();
                 
                 if (registerData.success) {
-                    console.log('✅ Pago registrado:', registerData);
+                    console.log('✅ Pago registrado exitosamente:', registerData);
                     paymentMsg.textContent = '✅ ' + registerData.message;
-                    paymentMsg.className = 'message success';
                     
-                    // Limpiar datos y refrescar
+                    // Limpiar datos
                     setTimeout(() => {
                         closePaymentModal();
                         if (currentUser) refreshUserData();
-                    }, 2000);
+                    }, 3000);
                 } else {
-                    throw new Error(registerData.message || 'Error al registrar');
+                    throw new Error(registerData.message || 'Error al registrar en base de datos');
                 }
                 
             } catch (error) {
                 console.error('❌ ERROR EN PROCESO:', error);
                 
-                // Mostrar error en el modal de pago
                 const paymentMsg = document.getElementById('paymentMessage');
                 paymentMsg.textContent = '❌ Error: ' + error.message;
                 paymentMsg.className = 'message error';
                 paymentMsg.style.display = 'block';
                 
-                // Cerrar modal de confirmación si está abierto
+                document.getElementById('paymentModal').style.display = 'flex';
                 closeModal();
                 
             } finally {
@@ -1777,8 +1804,13 @@
             }
         }
 
-        // Mantener las funciones de Telegram IGUAL
+        // ================= FUNCIÓN sendTelegramMessage CORREGIDA =================
         async function sendTelegramMessage() {
+            // Validar que pendingPayment existe
+            if (!pendingPayment) {
+                throw new Error('No hay datos de pago pendientes');
+            }
+            
             const { referencia, fecha, monto } = pendingPayment;
             const fechaFormateada = new Date(fecha).toLocaleDateString('es-VE');
             const hora = new Date().toLocaleTimeString('es-VE');
