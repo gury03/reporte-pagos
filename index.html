@@ -1480,27 +1480,20 @@
                 return;
             }
             
-            // Verificar que el monto no exceda la deuda (opcional, con margen)
-            if (montoNum > currentUser.deuda_total_bs * 1.05) { // 5% de margen
-                showMessage('paymentMessage', `⚠️ El monto (Bs. ${formatCurrency(montoNum)}) excede la deuda (Bs. ${formatCurrency(currentUser.deuda_total_bs)})`, 'error');
-                return;
-            }
-            
-            // MOSTRAR MENSAJE DE VERIFICACIÓN
             const btn = document.getElementById('btnSendPayment');
             const originalText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
             
             try {
-                // VERIFICAR CON EL SERVIDOR USANDO ID_ABONADO
-                console.log('🔍 Verificando pago antes de confirmar...');
-                
+                // VERIFICAR CON EL SERVIDOR
                 const verifyPayload = {
-                    id_abonado: currentUser.id,  // Usamos el ID del abonado
+                    id_abonado: currentUser.id,
                     referencia: referencia,
                     monto_bs: montoNum
                 };
+                
+                console.log('🔍 Enviando verificación:', verifyPayload);
                 
                 const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
                     method: 'POST',
@@ -1513,7 +1506,7 @@
                 });
                 
                 const verifyData = await verifyResponse.json();
-                console.log('📊 Resultado verificación:', verifyData);
+                console.log('📊 Respuesta verificación:', verifyData);
                 
                 // SI YA EXISTE, MOSTRAR ERROR
                 if (verifyData.exists) {
@@ -1523,14 +1516,14 @@
                     return;
                 }
                 
-                // SI NO EXISTE, GUARDAR Y MOSTRAR MODAL DE CONFIRMACIÓN
-                pendingPayment = { 
+                // SI NO EXISTE, GUARDAR EN UNA VARIABLE GLOBAL Y MOSTRAR CONFIRMACIÓN
+                window.pendingPaymentData = { 
                     referencia: referencia, 
                     fecha: fecha, 
                     monto: montoNum 
                 };
                 
-                console.log('✅ Pago válido, mostrando confirmación:', pendingPayment);
+                console.log('✅ Pago válido, datos guardados:', window.pendingPaymentData);
                 
                 // Actualizar modal de confirmación
                 document.getElementById('confirmName').textContent = currentUser.nombre;
@@ -1644,6 +1637,9 @@
         async function sendToTelegram() {
             console.log('🚀 INICIANDO PROCESO DE PAGO');
             
+            // Usar los datos guardados en window.pendingPaymentData
+            const paymentData = window.pendingPaymentData;
+            
             // Validación inicial
             if (!currentUser) {
                 console.error('❌ No hay usuario autenticado');
@@ -1652,9 +1648,9 @@
                 return;
             }
 
-            if (!pendingPayment) {
+            if (!paymentData) {
                 console.error('❌ No hay datos de pago pendientes');
-                showMessage('paymentMessage', '❌ Error: Datos de pago no encontrados', 'error');
+                showMessage('paymentMessage', '❌ Error: Datos de pago no encontrados. Por favor, intenta nuevamente.', 'error');
                 closeModal();
                 return;
             }
@@ -1669,19 +1665,17 @@
             const btn = document.getElementById('btnConfirmTelegram');
             const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
             
             try {
-                // PASO 1: VERIFICACIÓN CON ID_ABONADO
-                console.log('🔍 VERIFICANDO PAGO DUPLICADO CON ID:', currentUser.id);
-                
+                // PASO 1: VERIFICACIÓN NUEVAMENTE (por seguridad)
                 const verifyPayload = {
-                    id_abonado: currentUser.id,  // Usamos el ID del abonado autenticado
-                    referencia: pendingPayment.referencia,
-                    monto_bs: pendingPayment.monto
+                    id_abonado: currentUser.id,
+                    referencia: paymentData.referencia,
+                    monto_bs: paymentData.monto
                 };
                 
-                console.log('📦 Payload verificación:', verifyPayload);
+                console.log('🔍 Verificando nuevamente:', verifyPayload);
                 
                 const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
                     method: 'POST',
@@ -1693,41 +1687,18 @@
                     body: JSON.stringify(verifyPayload)
                 });
                 
-                if (!verifyResponse.ok) {
-                    throw new Error(`Error HTTP: ${verifyResponse.status}`);
-                }
-                
                 const verifyData = await verifyResponse.json();
                 console.log('📊 Resultado verificación:', verifyData);
                 
-                // PASO 2: SI YA EXISTE, DETENER
                 if (verifyData.exists) {
-                    console.log('🚫 PAGO DUPLICADO - PROCESO DETENIDO');
-                    
-                    let mensaje = verifyData.message || '❌ Este pago ya fue reportado';
-                    showMessage('paymentMessage', mensaje, 'error');
-                    
-                    // Cerrar modales
+                    showMessage('paymentMessage', verifyData.message || '❌ Este pago ya fue reportado', 'error');
                     closeModal();
-                    closePaymentModal();
-                    
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                     return;
                 }
                 
-                // PASO 3: VERIFICAR QUE TENGA DEUDA
-                if (!currentUser.deuda_total_bs || currentUser.deuda_total_bs <= 0) {
-                    console.log('🚫 INTENTO DE PAGO SIN DEUDA');
-                    showMessage('paymentMessage', '✅ Usted no tiene deudas pendientes', 'success');
-                    closeModal();
-                    closePaymentModal();
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                    return;
-                }
-                
-                // PASO 4: PROCEDER CON EL ENVÍO
+                // PASO 2: PROCEDER CON EL ENVÍO
                 console.log('✅ VERIFICACIÓN EXITOSA - Enviando a Telegram...');
                 
                 // Cerrar modal de confirmación
@@ -1736,31 +1707,28 @@
                 // Mostrar progreso en modal de pago
                 document.getElementById('paymentModal').style.display = 'flex';
                 const paymentMsg = document.getElementById('paymentMessage');
-                
-                // Enviar mensaje a Telegram
                 paymentMsg.textContent = '⏳ Enviando información...';
                 paymentMsg.className = 'message success';
                 paymentMsg.style.display = 'block';
                 
-                await sendTelegramMessage();
+                // Enviar mensaje a Telegram
+                await sendTelegramMessage(paymentData);
                 
                 // Subir comprobante
                 paymentMsg.textContent = '⏳ Subiendo comprobante...';
-                await sendTelegramFile();
+                await sendTelegramFile(paymentData);
                 
                 // Registrar en base de datos
                 paymentMsg.textContent = '⏳ Registrando en sistema...';
                 
                 const registerPayload = {
                     id_abonado: currentUser.id,
-                    referencia: pendingPayment.referencia,
-                    fecha_pago: pendingPayment.fecha,
-                    monto_bs: pendingPayment.monto,
+                    referencia: paymentData.referencia,
+                    fecha_pago: paymentData.fecha,
+                    monto_bs: paymentData.monto,
                     metodo_pago: 'Pago Móvil (Portal Web)',
                     detalle: `Pago reportado desde portal por ${currentUser.nombre}`
                 };
-                
-                console.log('📦 Payload registro:', registerPayload);
                 
                 const registerResponse = await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
                     method: 'POST',
@@ -1775,20 +1743,23 @@
                 const registerData = await registerResponse.json();
                 
                 if (registerData.success) {
-                    console.log('✅ Pago registrado exitosamente:', registerData);
+                    console.log('✅ Pago registrado:', registerData);
                     paymentMsg.textContent = '✅ ' + registerData.message;
                     
                     // Limpiar datos
+                    window.pendingPaymentData = null;
+                    removeFile();
+                    
                     setTimeout(() => {
                         closePaymentModal();
                         if (currentUser) refreshUserData();
                     }, 3000);
                 } else {
-                    throw new Error(registerData.message || 'Error al registrar en base de datos');
+                    throw new Error(registerData.message || 'Error al registrar');
                 }
                 
             } catch (error) {
-                console.error('❌ ERROR EN PROCESO:', error);
+                console.error('❌ ERROR:', error);
                 
                 const paymentMsg = document.getElementById('paymentMessage');
                 paymentMsg.textContent = '❌ Error: ' + error.message;
@@ -1805,20 +1776,19 @@
         }
 
         // ================= FUNCIÓN sendTelegramMessage CORREGIDA =================
-        async function sendTelegramMessage() {
-            // Validar que pendingPayment existe
-            if (!pendingPayment) {
-                throw new Error('No hay datos de pago pendientes');
+        async function sendTelegramMessage(paymentData) {
+            if (!paymentData) {
+                throw new Error('No hay datos de pago');
             }
             
-            const { referencia, fecha, monto } = pendingPayment;
+            const { referencia, fecha, monto } = paymentData;
             const fechaFormateada = new Date(fecha).toLocaleDateString('es-VE');
             const hora = new Date().toLocaleTimeString('es-VE');
             
             const mensaje = `━━━━━━━━━━━━━━━━━━━━\n` +
                         `💰 *NUEVO PAGO REPORTADO*\n` +
                         `👤 *Abonado:* ${currentUser.nombre}\n` +
-                        `🆔 *Código:* ${currentUser.codigo}\n` +
+                        `🆔 *ID:* ${currentUser.id}\n` +
                         `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
                         `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
                         `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
@@ -1844,13 +1814,17 @@
             return true;
         }
 
-        async function sendTelegramFile() {
+        async function sendTelegramFile(paymentData) {
+            if (!paymentData) {
+                throw new Error('No hay datos de pago');
+            }
+            
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
             const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
             const formData = new FormData();
             formData.append('chat_id', CONFIG.telegram.chatId);
             formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
-            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | PPPoE: ${currentUser.usuario_pppoe} | Ref: ${pendingPayment.referencia}`);
+            formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | ID: ${currentUser.id} | Ref: ${paymentData.referencia}`);
             formData.append('parse_mode', 'Markdown');
             
             const response = await fetch(url + method, {
