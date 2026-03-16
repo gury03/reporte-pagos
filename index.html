@@ -1559,10 +1559,11 @@
             }
         }
 
-        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (VERSIÓN FINAL) =================
+        // ================= FUNCIÓN PRINCIPAL DE ENVÍO (NUEVO ENFOQUE) =================
         async function sendToTelegram() {
-            console.log('🚀 Iniciando sendToTelegram');
+            console.log('🚀 INICIANDO PROCESO DE PAGO');
             
+            // Validación inicial
             if (!currentUser || !pendingPayment || !uploadedFile) {
                 showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
                 closeModal();
@@ -1570,12 +1571,20 @@
             }
             
             const btn = document.getElementById('btnConfirmTelegram');
+            const originalText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
             
             try {
-                // 1) Verificar si el pago ya existe
-                console.log('🔍 Verificando pago existente...');
+                // PASO 1: VERIFICAR ANTES QUE NADA
+                console.log('🔍 PASO 1: Verificando si el pago ya existe...');
+                
+                const verifyPayload = {
+                    codigo: currentUser.usuario_pppoe,
+                    referencia: pendingPayment.referencia,
+                    monto_bs: pendingPayment.monto
+                };
+                console.log('📦 Payload verificación:', verifyPayload);
                 
                 const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
                     method: 'POST',
@@ -1584,19 +1593,19 @@
                         'Accept': 'application/json',
                         'X-Database': selectedDatabase
                     },
-                    body: JSON.stringify({
-                        codigo: currentUser.usuario_pppoe,
-                        referencia: pendingPayment.referencia,
-                        monto_bs: pendingPayment.monto
-                    })
+                    body: JSON.stringify(verifyPayload)
                 });
                 
-                const verifyData = await verifyResponse.json();
-                console.log('📊 Respuesta verificación:', verifyData);
+                if (!verifyResponse.ok) {
+                    throw new Error(`Error HTTP: ${verifyResponse.status}`);
+                }
                 
-                // 2) Si el pago YA existe, mostrar mensaje y SALIR SIN ERROR
+                const verifyData = await verifyResponse.json();
+                console.log('📊 Resultado verificación:', verifyData);
+                
+                // PASO 2: SI YA EXISTE, DETENER TODO AQUÍ
                 if (verifyData.exists) {
-                    console.log('🚫 PAGO DUPLICADO DETECTADO');
+                    console.log('🚫 PASO 2: PAGO DUPLICADO - DETENIENDO PROCESO');
                     
                     let mensaje = '';
                     if (verifyData.table === 'pagos') {
@@ -1608,38 +1617,56 @@
                             mensaje = '✅ ESTE PAGO YA FUE CONFIRMADO';
                         } else if (verifyData.estado === 'RECHAZADO') {
                             mensaje = '❌ ESTE PAGO FUE RECHAZADO. Contacta a soporte';
-                        } else {
-                            mensaje = '❌ YA EXISTE UN REGISTRO DE ESTE PAGO';
                         }
                     }
                     
-                    // Mostrar mensaje
-                    showMessage('paymentMessage', mensaje, 'error');
+                    // Mostrar mensaje en el modal de pago (no en el de confirmación)
+                    const paymentMsg = document.getElementById('paymentMessage');
+                    paymentMsg.textContent = mensaje;
+                    paymentMsg.className = 'message error';
+                    paymentMsg.style.display = 'block';
                     
-                    // Cerrar modales
-                    setTimeout(() => {
-                        closePaymentModal();
-                        closeModal();
-                    }, 3000);
+                    // Cerrar el modal de confirmación y volver al modal de pago
+                    closeModal();
+                    
+                    // Deshabilitar el botón de enviar en el modal de pago temporalmente
+                    const sendBtn = document.getElementById('btnSendPayment');
+                    if (sendBtn) {
+                        sendBtn.disabled = true;
+                        setTimeout(() => {
+                            sendBtn.disabled = false;
+                        }, 3000);
+                    }
                     
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-                    
-                    // IMPORTANTE: Solo retornar, NO lanzar error
-                    return;
+                    btn.innerHTML = originalText;
+                    return; // SALIR TOTALMENTE - NO CONTINUAR
                 }
                 
-                // 3) Si NO existe, continuar con el envío
-                console.log('✅ Pago no existe, enviando a Telegram...');
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando a Telegram...';
+                // PASO 3: SI NO EXISTE, PROCEDER CON EL ENVÍO
+                console.log('✅ PASO 3: Pago no existe, procediendo con envío...');
                 
+                // Cerrar modal de confirmación
+                closeModal();
+                
+                // Mostrar mensaje de proceso en el modal de pago
+                const paymentMsg = document.getElementById('paymentMessage');
+                paymentMsg.textContent = '⏳ Enviando información a Telegram...';
+                paymentMsg.className = 'message success';
+                paymentMsg.style.display = 'block';
+                
+                // Enviar a Telegram
+                console.log('📤 Enviando mensaje a Telegram...');
                 await sendTelegramMessage();
+                console.log('✅ Mensaje enviado');
                 
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo comprobante...';
+                paymentMsg.textContent = '⏳ Subiendo comprobante...';
                 await sendTelegramFile();
+                console.log('✅ Comprobante subido');
                 
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando en base de datos...';
+                paymentMsg.textContent = '⏳ Registrando en base de datos...';
                 
+                // Registrar en base de datos
                 const registerResponse = await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
                     method: 'POST',
                     headers: {
@@ -1660,55 +1687,55 @@
                 const registerData = await registerResponse.json();
                 
                 if (registerData.success) {
-                    console.log('✅ Pago registrado');
-                    showMessage('paymentMessage', '✅ ' + registerData.message, 'success');
+                    console.log('✅ Pago registrado:', registerData);
+                    paymentMsg.textContent = '✅ ' + registerData.message;
+                    paymentMsg.className = 'message success';
                     
+                    // Limpiar datos y refrescar
                     setTimeout(() => {
                         closePaymentModal();
-                        closeModal();
                         if (currentUser) refreshUserData();
                     }, 2000);
                 } else {
-                    // Si hay error en el registro, mostrarlo pero NO lanzar excepción
-                    showMessage('paymentMessage', '❌ ' + (registerData.message || 'Error al registrar'), 'error');
-                    setTimeout(() => {
-                        closePaymentModal();
-                        closeModal();
-                    }, 3000);
+                    throw new Error(registerData.message || 'Error al registrar');
                 }
                 
             } catch (error) {
-                // Este catch solo atrapa errores de red o inesperados
-                console.error('❌ Error inesperado:', error);
-                showMessage('paymentMessage', '❌ Error de conexión: ' + error.message, 'error');
+                console.error('❌ ERROR EN PROCESO:', error);
                 
-                setTimeout(() => {
-                    closePaymentModal();
-                    closeModal();
-                }, 3000);
+                // Mostrar error en el modal de pago
+                const paymentMsg = document.getElementById('paymentMessage');
+                paymentMsg.textContent = '❌ Error: ' + error.message;
+                paymentMsg.className = 'message error';
+                paymentMsg.style.display = 'block';
+                
+                // Cerrar modal de confirmación si está abierto
+                closeModal();
+                
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+                btn.innerHTML = originalText;
             }
         }
-        
+
+        // Mantener las funciones de Telegram IGUAL
         async function sendTelegramMessage() {
             const { referencia, fecha, monto } = pendingPayment;
             const fechaFormateada = new Date(fecha).toLocaleDateString('es-VE');
             const hora = new Date().toLocaleTimeString('es-VE');
             
             const mensaje = `━━━━━━━━━━━━━━━━━━━━\n` +
-                           `💰 *NUEVO PAGO REPORTADO*\n` +
-                           `👤 *Abonado:* ${currentUser.nombre}\n` +
-                           `🆔 *Código:* ${currentUser.codigo}\n` +
-                           `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
-                           `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
-                           `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
-                           `📅 *Fecha pago:* ${fechaFormateada}\n` +
-                           `🔢 *Referencia:* ${referencia}\n` +
-                           `⏰ *Hora:* ${hora}\n` +
-                           `📊 *Tasa cambio:* ${CONFIG.tasaCambio.toFixed(2)} Bs./USD\n` +
-                           `━━━━━━━━━━━━━━━━━━━━\n`;
+                        `💰 *NUEVO PAGO REPORTADO*\n` +
+                        `👤 *Abonado:* ${currentUser.nombre}\n` +
+                        `🆔 *Código:* ${currentUser.codigo}\n` +
+                        `📡 *PPPoE:* ${currentUser.usuario_pppoe}\n` +
+                        `📞 *Teléfono:* ${currentUser.telefono || 'N/D'}\n` +
+                        `💵 *Monto:* Bs. ${formatCurrency(monto)}\n` +
+                        `📅 *Fecha pago:* ${fechaFormateada}\n` +
+                        `🔢 *Referencia:* ${referencia}\n` +
+                        `⏰ *Hora:* ${hora}\n` +
+                        `📊 *Tasa cambio:* ${CONFIG.tasaCambio.toFixed(2)} Bs./USD\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n`;
             
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`;
             const response = await fetch(url, {
@@ -1725,7 +1752,7 @@
             if (!data.ok) throw new Error(data.description || 'Error de Telegram');
             return true;
         }
-        
+
         async function sendTelegramFile() {
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
             const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
