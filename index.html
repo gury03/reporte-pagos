@@ -137,13 +137,6 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         }
 
-        .message.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-            display: block;
-        }
-
         .login-title {
             font-size: 28px;
             color: var(--dark);
@@ -223,6 +216,13 @@
             background: #fee2e2;
             color: #991b1b;
             border: 1px solid #fecaca;
+            display: block;
+        }
+
+        .message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
             display: block;
         }
 
@@ -999,6 +999,7 @@
         let currentUser = null;
         let currentCurrency = 'BS';
         let uploadedFile = null;
+        let pendingFile = null;  // Variable global para el archivo
         let pendingPayment = null;
         let refreshInterval = null;
         let isTechLoggedIn = false;
@@ -1148,7 +1149,9 @@
             stopAutoRefresh();
             currentUser = null;
             uploadedFile = null;
+            pendingFile = null;
             pendingPayment = null;
+            window.pendingPaymentData = null;
             isTechLoggedIn = false;
             
             document.getElementById('techIcon').classList.remove('active');
@@ -1397,7 +1400,6 @@
         
         function closeModal() {
             document.getElementById('confirmationModal').style.display = 'none';
-            clearAllPaymentData();
         }
         
         function showConfirmationModal() {
@@ -1413,7 +1415,9 @@
         
         function clearAllPaymentData() {
             uploadedFile = null;
+            pendingFile = null;
             pendingPayment = null;
+            window.pendingPaymentData = null;
             document.getElementById('referencia').value = '';
             document.getElementById('monto').value = '';
             document.getElementById('comprobante').value = '';
@@ -1423,25 +1427,35 @@
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+            
             if (file.size > 10 * 1024 * 1024) {
                 showMessage('paymentMessage', 'El archivo es demasiado grande (máximo 10MB)', 'error');
                 return;
             }
+            
             const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
             if (!allowedTypes.includes(file.type)) {
                 showMessage('paymentMessage', 'Formato no permitido. Usa JPG, PNG o PDF', 'error');
                 return;
             }
+            
+            // Guardar en ambas variables para respaldo
             uploadedFile = file;
+            pendingFile = file;
+            
             document.getElementById('fileInfo').style.display = 'block';
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            
+            console.log('📁 Archivo guardado:', file.name, file.type, file.size);
         }
         
         function removeFile() {
             uploadedFile = null;
+            pendingFile = null;
             document.getElementById('comprobante').value = '';
             document.getElementById('fileInfo').style.display = 'none';
+            console.log('🗑️ Archivo eliminado');
         }
         
         function formatFileSize(bytes) {
@@ -1450,7 +1464,7 @@
             return (bytes / 1048576).toFixed(2) + ' MB';
         }
         
-        // ================= VALIDAR PAGO (CON VERIFICACIÓN ANTES DE CONFIRMAR) =================
+        // ================= VALIDAR PAGO =================
         async function validatePayment() {
             const referencia = document.getElementById('referencia').value.trim();
             const fecha = document.getElementById('fechaPago').value;
@@ -1574,96 +1588,7 @@
             }
         }
         
-        function showMessage(elementId, message, type) {
-            const element = document.getElementById(elementId);
-            element.textContent = message;
-            element.className = `message ${type}`;
-            element.style.display = 'block';
-            if (type === 'success') {
-                setTimeout(() => {
-                    element.style.display = 'none';
-                }, 5000);
-            }
-        }
-        
-        function formatCurrency(amount) {
-            const numAmount = typeof amount === 'string' ? parseFloat(amount.replace(/,/g, '')) : parseFloat(amount);
-            return numAmount.toLocaleString('es-VE', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-        
-        async function refreshUserData() {
-            if (!currentUser || !currentUser.usuario_pppoe) return false;
-            
-            try {
-                const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-Database': selectedDatabase
-                    },
-                    body: JSON.stringify({ 
-                        nombre: currentUser.nombre,
-                        codigo: currentUser.usuario_pppoe, 
-                        telefono: currentUser.telefono 
-                    })
-                });
-                
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const data = await response.json();
-
-                if (data.success) {
-                    if (data.tasa_cambio) {
-                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
-                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
-                    }
-                    
-                    currentUser = {
-                        ...data.abonado,
-                        tasa_cambio: data.tasa_cambio,
-                        deuda_total_bs: data.abonado.deuda_total_bs || 0,
-                        deuda_meses: data.deudas ? data.deudas.map(d => d.mes).join(', ') : '',
-                        pagos_cache: data.pagos || []
-                    };
-
-                    localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
-                    loadUserData();
-                    
-                    const deudaBs = data.abonado.deuda_total_bs || 0;
-                    const meses = data.deudas ? data.deudas.map(d => d.mes).join(', ') : '';
-                    updateDebtDisplay(deudaBs, meses);
-                    
-                    if (data.pagos) updatePaymentsTable(data.pagos);
-                    return true;
-                }
-                return false;
-                
-            } catch (error) {
-                console.error('❌ Error en refreshUserData:', error);
-                return false;
-            }
-        }
-
-        function startAutoRefresh() {
-            if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(async () => {
-                if (currentUser) await refreshUserData();
-                else stopAutoRefresh();
-            }, 60000);
-        }
-
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-
-        // ================= FUNCIÓN PRINCIPAL DE ENVÍO (NUEVO ENFOQUE) =================
+        // ================= FUNCIÓN PRINCIPAL DE ENVÍO =================
         async function sendToTelegram() {
             console.log('🚀 INICIANDO PROCESO DE PAGO');
             
@@ -1825,7 +1750,7 @@
             }
         }
 
-        // ================= FUNCIÓN sendTelegramMessage CORREGIDA =================
+        // ================= FUNCIÓN sendTelegramMessage =================
         async function sendTelegramMessage(paymentData) {
             if (!paymentData) {
                 throw new Error('No hay datos de pago');
@@ -1864,16 +1789,20 @@
             return true;
         }
 
-        async function sendTelegramFile(paymentData) {
+        // ================= FUNCIÓN sendTelegramFile =================
+        async function sendTelegramFile(paymentData, file) {
             if (!paymentData) {
                 throw new Error('No hay datos de pago');
             }
+            if (!file) {
+                throw new Error('No hay archivo para enviar');
+            }
             
             const url = `https://api.telegram.org/bot${CONFIG.telegram.botToken}/`;
-            const method = uploadedFile.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
+            const method = file.type.startsWith('image/') ? 'sendPhoto' : 'sendDocument';
             const formData = new FormData();
             formData.append('chat_id', CONFIG.telegram.chatId);
-            formData.append(method === 'sendPhoto' ? 'photo' : 'document', uploadedFile);
+            formData.append(method === 'sendPhoto' ? 'photo' : 'document', file);
             formData.append('caption', `📄 Comprobante: ${currentUser.nombre} | ID: ${currentUser.id} | Ref: ${paymentData.referencia}`);
             formData.append('parse_mode', 'Markdown');
             
@@ -1885,6 +1814,95 @@
             const data = await response.json();
             if (!data.ok) throw new Error(data.description || 'Error subiendo archivo');
             return true;
+        }
+        
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `message ${type}`;
+            element.style.display = 'block';
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        function formatCurrency(amount) {
+            const numAmount = typeof amount === 'string' ? parseFloat(amount.replace(/,/g, '')) : parseFloat(amount);
+            return numAmount.toLocaleString('es-VE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        async function refreshUserData() {
+            if (!currentUser || !currentUser.usuario_pppoe) return false;
+            
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/verify-abonado`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Database': selectedDatabase
+                    },
+                    body: JSON.stringify({ 
+                        nombre: currentUser.nombre,
+                        codigo: currentUser.usuario_pppoe, 
+                        telefono: currentUser.telefono 
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.tasa_cambio) {
+                        CONFIG.tasaCambio = parseFloat(data.tasa_cambio);
+                        document.getElementById('exchangeRate').textContent = CONFIG.tasaCambio.toFixed(2);
+                    }
+                    
+                    currentUser = {
+                        ...data.abonado,
+                        tasa_cambio: data.tasa_cambio,
+                        deuda_total_bs: data.abonado.deuda_total_bs || 0,
+                        deuda_meses: data.deudas ? data.deudas.map(d => d.mes).join(', ') : '',
+                        pagos_cache: data.pagos || []
+                    };
+
+                    localStorage.setItem('portal_abonado', JSON.stringify(currentUser));
+                    loadUserData();
+                    
+                    const deudaBs = data.abonado.deuda_total_bs || 0;
+                    const meses = data.deudas ? data.deudas.map(d => d.mes).join(', ') : '';
+                    updateDebtDisplay(deudaBs, meses);
+                    
+                    if (data.pagos) updatePaymentsTable(data.pagos);
+                    return true;
+                }
+                return false;
+                
+            } catch (error) {
+                console.error('❌ Error en refreshUserData:', error);
+                return false;
+            }
+        }
+
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(async () => {
+                if (currentUser) await refreshUserData();
+                else stopAutoRefresh();
+            }, 60000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
         }
         
         async function checkApiConnection() {
