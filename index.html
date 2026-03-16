@@ -1639,7 +1639,7 @@
                 console.log('🔍 PASO 1: Verificando si el pago ya existe...');
                 
                 const verifyPayload = {
-                    codigo: currentUser.usuario_pppoe,
+                    id_abonado: currentUser.id,
                     referencia: pendingPayment.referencia,
                     monto_bs: pendingPayment.monto
                 };
