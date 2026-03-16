@@ -1559,9 +1559,17 @@
             }
         }
 
-        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CORREGIDA DEFINITIVA) =================
+        // ================= FUNCIÓN PRINCIPAL DE ENVÍO A TELEGRAM (CON LOGS) =================
         async function sendToTelegram() {
+            console.log('🚀 [DEBUG] Iniciando sendToTelegram');
+            console.log('📦 Datos:', {
+                currentUser: !!currentUser,
+                pendingPayment: !!pendingPayment,
+                uploadedFile: !!uploadedFile
+            });
+            
             if (!currentUser || !pendingPayment || !uploadedFile) {
+                console.log('❌ [DEBUG] Faltan datos');
                 showMessage('paymentMessage', '❌ Faltan datos para enviar', 'error');
                 closeModal();
                 return;
@@ -1573,7 +1581,7 @@
             
             try {
                 // 1) PRIMERO: Verificar en la base de datos si el pago ya existe
-                console.log('🔍 Verificando si el pago ya existe...');
+                console.log('🔍 [DEBUG] Enviando solicitud de verificación...');
                 
                 const verifyResponse = await fetch(`${CONFIG.apiUrl}/verificar-pago-existente`, {
                     method: 'POST',
@@ -1589,11 +1597,14 @@
                     })
                 });
                 
-                const verifyData = await verifyResponse.json();
+                console.log('📡 [DEBUG] Respuesta de verificación status:', verifyResponse.status);
                 
-                // 2) Si el pago YA existe, mostrar mensaje y TERMINAR AQUÍ (sin enviar a Telegram)
+                const verifyData = await verifyResponse.json();
+                console.log('📊 [DEBUG] Datos de verificación:', verifyData);
+                
+                // 2) Si el pago YA existe, mostrar mensaje y TERMINAR AQUÍ
                 if (verifyData.exists) {
-                    console.log('🚫 PAGO DUPLICADO DETECTADO - CANCELANDO ENVÍO');
+                    console.log('🚫 [DEBUG] PAGO DUPLICADO DETECTADO - CANCELANDO ENVÍO');
                     
                     let mensaje = '';
                     if (verifyData.table === 'pagos') {
@@ -1610,7 +1621,7 @@
                         }
                     }
                     
-                    // Mostrar mensaje de error en el modal
+                    // Mostrar mensaje de error
                     showMessage('paymentMessage', mensaje, 'error');
                     
                     // Cerrar modales después de 3 segundos
@@ -1621,22 +1632,26 @@
                     
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+                    console.log('✅ [DEBUG] Proceso cancelado por duplicado - NO se envió a Telegram');
                     return; // ✅ SALIR AQUÍ - NO ENVIAR NADA A TELEGRAM
                 }
                 
                 // 3) Si NO existe, proceder con el envío a Telegram
-                console.log('✅ Pago no existe, procediendo con el envío a Telegram...');
+                console.log('✅ [DEBUG] Pago no existe, procediendo con el envío a Telegram...');
+                
+                console.log('📤 [DEBUG] Enviando mensaje a Telegram...');
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando a Telegram...';
-                
-                // Enviar mensaje a Telegram
                 await sendTelegramMessage();
+                console.log('✅ [DEBUG] Mensaje enviado');
                 
+                console.log('📎 [DEBUG] Subiendo comprobante...');
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo comprobante...';
                 await sendTelegramFile();
+                console.log('✅ [DEBUG] Comprobante subido');
                 
+                console.log('💾 [DEBUG] Registrando en base de datos...');
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando en base de datos...';
                 
-                // Registrar en pagos_online
                 const registerResponse = await fetch(`${CONFIG.apiUrl}/registrar-pago-online`, {
                     method: 'POST',
                     headers: {
@@ -1655,9 +1670,10 @@
                 });
                 
                 const registerData = await registerResponse.json();
+                console.log('📊 [DEBUG] Respuesta de registro:', registerData);
                 
                 if (registerData.success) {
-                    console.log('✅ Pago registrado en pagos_online:', registerData);
+                    console.log('✅ [DEBUG] Pago registrado exitosamente');
                     showMessage('paymentMessage', '✅ ' + registerData.message, 'success');
                     
                     setTimeout(() => {
@@ -1670,7 +1686,7 @@
                 }
                 
             } catch (error) {
-                console.error('❌ Error en proceso de pago:', error);
+                console.error('❌ [DEBUG] Error en proceso:', error);
                 showMessage('paymentMessage', '❌ Error: ' + error.message, 'error');
                 
                 setTimeout(() => {
